@@ -1,0 +1,26 @@
+{
+  "name": "mosslight",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run tests/systems.test.ts",
+    "test:browser": "playwright test",
+    "test:production": "playwright test --config playwright.production.config.ts",
+    "format": "prettier --write src tests *.ts *.json *.md"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4",
+    "@playwright/test": "^1.58.2",
+    "prettier": "^3.6.2"
+  }
+}
