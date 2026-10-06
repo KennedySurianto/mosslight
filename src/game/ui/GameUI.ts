@@ -161,6 +161,7 @@ export class GameUI {
     window.addEventListener("pointerup", (e) => this.endDrag(e), { signal: this.listeners.signal });
     window.addEventListener("pointercancel", () => this.cancelDrag(), { signal: this.listeners.signal });
     window.addEventListener("keydown", (e) => {
+      if (document.querySelector("#online-app:not([hidden])")) return;
       if (this.shopPanel.open) {
         if (e.code === "Escape") {
           e.preventDefault();

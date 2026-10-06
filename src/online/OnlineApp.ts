@@ -9,6 +9,7 @@ export class OnlineApp {
   private root = document.createElement("div");
   private busy = false;
   private mode: "login" | "register" = "login";
+  private lastWorldId?: string;
   constructor(private game: Phaser.Game) {
     this.root.id = "online-app";
     document.body.append(this.root);
@@ -24,7 +25,15 @@ export class OnlineApp {
       else this.auth();
     } catch { this.auth(); }
   }
-  private set(html: string) { this.root.innerHTML = `<div class="online-shade"><section class="online-card">${html}</section></div>`; }
+  private set(html: string) {
+    this.root.innerHTML = `<div class="online-shade"><section class="online-card" role="dialog" aria-modal="true">${html}</section></div>`;
+    this.root.hidden = false;
+    const keyboard = this.scene().input.keyboard;
+    if (keyboard) {
+      keyboard.enabled = false;
+      keyboard.disableGlobalCapture();
+    }
+  }
   private error(message: string) {
     const target = this.root.querySelector<HTMLElement>(".online-error");
     if (target) target.textContent = message;
@@ -56,8 +65,9 @@ export class OnlineApp {
     const own = data.worlds.find((world) => world.ownerId === data.profile.user_id);
     const worlds = data.worlds.map((world) => `<article class="online-row"><div><b>${escape(world.name)}</b><small>by ${escape(world.owner)}${world.id === own?.id ? " · Your world" : ""}</small></div><button data-world="${world.id}">Visit ↗</button></article>`).join("");
     const friends = data.friends.map((friend) => `<article class="online-row"><div><b>${escape(friend.username)}</b><small>${friend.status === "accepted" ? "Friend" : friend.incoming ? "Wants to be friends" : "Request sent"}</small></div><div class="online-row-actions">${friend.incoming && friend.status !== "accepted" ? `<button data-social="accept" data-name="${escape(friend.username)}">Accept</button>` : ""}<button data-social="remove" data-name="${escape(friend.username)}">Remove</button>${friend.status === "accepted" && own ? `<button data-social="builder" data-name="${escape(friend.username)}" data-world-id="${own.id}" title="Let this friend build in your world">Allow building</button>` : ""}</div></article>`).join("");
-    this.set(`<div class="online-head"><div><span class="eyebrow">Mosslight · Online</span><h1>Hello, ${escape(data.profile.username)}.</h1></div><button id="logout">Log out</button></div><p>Choose a world, visit friends, and make the meadow your own.</p><h2>Worlds</h2><div class="online-list">${worlds || "Your first world is growing..."}</div><h2>Friends</h2><form id="friend-request" class="online-inline"><input name="username" placeholder="Friend's username" maxlength="20" required><button>Send request</button></form><div class="online-list">${friends || '<p class="online-muted">No friends yet. Send someone a request above.</p>'}</div><p class="online-error" role="alert"></p>`);
-    this.root.querySelector("#logout")!.addEventListener("click", () => void this.run(async () => { await this.client.signOut(); this.mode = "login"; this.auth(); }));
+    this.set(`<div class="online-head"><div><span class="eyebrow">Mosslight · Online</span><h1>Hello, ${escape(data.profile.username)}.</h1></div><div class="online-head-actions"><button id="logout">Log out</button>${this.lastWorldId ? '<button id="close-worlds" class="online-close" aria-label="Close Worlds" title="Return to your world">×</button>' : ""}</div></div><p>Choose a world, visit friends, and make the meadow your own.</p><h2>Worlds</h2><div class="online-list">${worlds || "Your first world is growing..."}</div><h2>Friends</h2><form id="friend-request" class="online-inline"><input name="username" placeholder="Friend's username" maxlength="20" required><button>Send request</button></form><div class="online-list">${friends || '<p class="online-muted">No friends yet. Send someone a request above.</p>'}</div><p class="online-error" role="alert"></p>`);
+    this.root.querySelector("#close-worlds")?.addEventListener("click", () => void this.run(async () => { await this.enter(this.lastWorldId!); }));
+    this.root.querySelector("#logout")!.addEventListener("click", () => void this.run(async () => { await this.client.signOut(); this.lastWorldId = undefined; this.mode = "login"; this.auth(); }));
     this.root.querySelectorAll<HTMLButtonElement>("[data-world]").forEach((button) => button.addEventListener("click", () => void this.run(async () => { await this.enter(button.dataset.world!); })));
     this.root.querySelector("#friend-request")!.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -71,18 +81,28 @@ export class OnlineApp {
   }
   private async enter(worldId: string) {
     const snapshot: OnlineSnapshot = await this.client.join(worldId);
-    this.root.hidden = true;
+    this.lastWorldId = worldId;
     const scene = this.scene();
     scene.online = this.client;
     scene.onLeaveOnline = () => void this.leaveWorld();
     this.game.scene.stop("Game");
     this.game.scene.start("Game");
     this.client.snapshot = snapshot;
+    this.root.hidden = true;
+    if (scene.input.keyboard) {
+      scene.input.keyboard.enabled = true;
+      scene.input.keyboard.enableGlobalCapture();
+    }
   }
   private async leaveWorld() {
-    await this.client.leave();
-    this.game.scene.stop("Game");
     this.root.hidden = false;
+    const keyboard = this.scene().input.keyboard;
+    if (keyboard) {
+      keyboard.enabled = false;
+      keyboard.disableGlobalCapture();
+    }
+    this.game.scene.stop("Game");
+    await this.client.leave();
     try { await this.client.refresh(); this.lobby(); }
     catch (error) { this.error(error instanceof Error ? error.message : "Could not load worlds"); }
   }

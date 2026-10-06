@@ -1353,6 +1353,9 @@ button:active {
 .online-card small { font-size: 10px; color: #7c8a70; }
 .online-error { min-height: 18px; color: #a33f38 !important; }
 .online-head,.online-row,.online-inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.online-head-actions { display: flex; align-items: center; gap: 8px; }
+.online-card button.online-close { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; font-size: 23px; line-height: 1; color: #345541; background: #dce7d2; }
+.online-card button.online-close:hover { background: #cbdcbe; }
 .online-row { padding: 12px 0; border-bottom: 1px solid #82936535; }
 .online-row b,.online-row small { display: block; }
 .online-row b { font-size: 13px; }
