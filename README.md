@@ -1,6 +1,6 @@
 # Mosslight
 
-Mosslight is a Growtopia-inspired, single-player 2D sandbox game about exploring, digging, and growing a world of your own. It pairs original pixel-art visuals with a cozy world that saves your progress in the browser.
+Mosslight is a Growtopia-inspired 2D sandbox game where players explore, build, and grow their own pixel-art worlds. It includes a guided solo experience and an online mode with shared worlds, friends, and account-based progress.
 
 ## Highlights
 
@@ -8,13 +8,14 @@ Mosslight is a Growtopia-inspired, single-player 2D sandbox game about exploring
 - Dig, collect, craft your loadout, and place blocks, seeds, and decorations.
 - Grow and harvest plants, earn gems, and unlock tools and movement upgrades in the shop.
 - Learn the game through a guided tutorial, responsive sign prompts, and sound feedback.
-- Save, export, and restore world progress locally—no account or server required.
+- Play solo with local saves, or register to visit friends and build together online.
 
 ## Tech
 
 - **TypeScript** — game systems and UI
 - **Phaser 4** — 2D game rendering and interaction
 - **Vite** — development server and production builds
+- **Supabase** — account auth, protected game data, Edge Functions, and Realtime rooms
 - **Vitest & Playwright** — unit and browser testing
 - **pnpm** — package management
 
@@ -27,6 +28,8 @@ pnpm install
 pnpm dev
 ```
 
+Solo play works without environment variables. To enable online play, copy `.env.example` to `.env.local` and add the Supabase project URL and publishable key. Deploy the SQL migrations and the `mosslight-auth` and `mosslight-game` Edge Functions first. Keep service or secret keys out of the browser and repository.
+
 ## Build and test
 
 ```sh
@@ -35,4 +38,4 @@ pnpm test
 pnpm test:browser
 ```
 
-The production build is a static site and can be hosted on any static web host. Game progress is stored in the browser.
+The production build is a static site suitable for Vercel. Online worlds live in Supabase; solo progress stays in the browser.

@@ -15,6 +15,7 @@ playwright-report/
 .env
 .env.*
 !.env.example
+!.env.production
 *.local
 
 # Logs
@@ -27,3 +28,5 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
+.tracker-review/
+supabase/.temp/

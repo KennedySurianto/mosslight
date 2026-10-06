@@ -8,19 +8,21 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run tests/systems.test.ts",
+    "test": "vitest run tests/systems.test.ts tests/online-rules.test.ts",
     "test:browser": "playwright test",
     "test:production": "playwright test --config playwright.production.config.ts",
     "format": "prettier --write src tests *.ts *.json *.md"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "prettier": "^3.6.2",
+    "supabase": "2.119.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vitest": "^3.2.4",
-    "@playwright/test": "^1.58.2",
-    "prettier": "^3.6.2"
+    "vitest": "^3.2.4"
   }
 }

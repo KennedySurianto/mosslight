@@ -16,8 +16,11 @@ export interface UIActions {
   pause: (paused: boolean) => void;
   buy: (id: string) => void;
   shopState: () => { gems: number; owned: UpgradeId[] };
+  moveInventory?: (from: number, to: number) => void;
+  leaveWorld?: () => void;
 }
 export class GameUI {
+  private listeners = new AbortController();
   root = document.querySelector<HTMLDivElement>("#ui")!;
   open = false;
   paused = false;
@@ -51,6 +54,15 @@ export class GameUI {
       actions.feedback();
       if (open) this.toggleInventory(false);
     });
+    if (actions.leaveWorld) {
+      const button = document.createElement("button");
+      button.id = "leave-world";
+      button.textContent = "Worlds ↗";
+      button.addEventListener("click", actions.leaveWorld);
+      this.root.querySelector(".hud-actions")!.prepend(button);
+      this.root.querySelector(".world-label")!.innerHTML = "<i></i> SHARED WORLD";
+      this.root.querySelector(".menu-note")!.textContent = "Worlds and inventory are saved online.";
+    }
     for (let i = 0; i < GAME.slots; i++) {
       const s = document.createElement("button");
       s.className = "slot";
@@ -145,9 +157,9 @@ export class GameUI {
     handle.addEventListener("click", (e) => {
       if (e.detail === 0) this.toggleInventory();
     });
-    window.addEventListener("pointermove", (e) => this.moveDrag(e));
-    window.addEventListener("pointerup", (e) => this.endDrag(e));
-    window.addEventListener("pointercancel", () => this.cancelDrag());
+    window.addEventListener("pointermove", (e) => this.moveDrag(e), { signal: this.listeners.signal });
+    window.addEventListener("pointerup", (e) => this.endDrag(e), { signal: this.listeners.signal });
+    window.addEventListener("pointercancel", () => this.cancelDrag(), { signal: this.listeners.signal });
     window.addEventListener("keydown", (e) => {
       if (this.shopPanel.open) {
         if (e.code === "Escape") {
@@ -181,11 +193,12 @@ export class GameUI {
       }
       if (/^Digit[1-8]$/.test(e.code) && !this.paused)
         this.select(Number(e.code.slice(-1)) - 1);
-    });
-    window.addEventListener("resize", () => this.toggleInventory(this.open));
+    }, { signal: this.listeners.signal });
+    window.addEventListener("resize", () => this.toggleInventory(this.open), { signal: this.listeners.signal });
     this.render();
     this.toggleInventory(false);
   }
+  destroy() { this.listeners.abort(); this.cancelDrag(); }
   private drawerHeight() {
     return (this.root.querySelector(".backpack") as HTMLElement).offsetHeight;
   }
@@ -269,7 +282,8 @@ export class GameUI {
         .elementFromPoint(e.clientX, e.clientY)
         ?.closest<HTMLElement>("[data-slot]");
       if (target) {
-        this.inventory.move(this.dragFrom, Number(target.dataset.slot));
+        if (this.actions.moveInventory) this.actions.moveInventory(this.dragFrom, Number(target.dataset.slot));
+        else this.inventory.move(this.dragFrom, Number(target.dataset.slot));
         target.animate(
           [{ transform: "scale(.88)" }, { transform: "scale(1)" }],
           { duration: 180 },
@@ -312,6 +326,7 @@ export class GameUI {
       harvested: number;
     },
     guide: GuideProgress,
+    online = false,
   ) {
     this.root.querySelector("#gem-count")!.textContent = gems.toLocaleString();
     this.root.querySelector("#coordinates")!.textContent =
@@ -322,7 +337,7 @@ export class GameUI {
       y > 31 ? "There is more beneath the surface" : "A place to begin";
     this.root.querySelector("#save-status")!.innerHTML = error
       ? "Export to keep your progress"
-      : "<i></i> Saved in this browser";
+      : online ? "<i></i> Synced online" : "<i></i> Saved in this browser";
     const steps = guideSteps(guide, stats),
       key = steps.map((s) => `${s.done}:${s.help}`).join("|");
     if (key !== this.guideKey) {
