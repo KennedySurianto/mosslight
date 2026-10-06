@@ -19,6 +19,15 @@ describe("server-authoritative multiplayer rules", () => {
     expect(second.profile.stats.broken).toBe(1);
   });
 
+  it("validates a position and block hit together without a prior position write", () => {
+    const world = initialWorld(seed), profile = initialProfile(), session = initialSession();
+    const moved = moveSession(session, world, seed, 688, 736, 1, session.lastPositionAt + 300);
+    const hit = applyAction({ world, profile, session: moved, seed, kind: "hit", x: 21, y: 23,
+      now: moved.lastPositionAt, canBuild: true });
+    expect(hit.session.x).toBe(688);
+    expect(hit.session.damageHits).toBe(1);
+  });
+
   it("requires clearing foliage before building on that tile", () => {
     const world = initialWorld(seed), profile = initialProfile(), session = initialSession();
     // x=22 has a wildflower for this deterministic seed.

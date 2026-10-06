@@ -26,6 +26,7 @@ export class GameScene extends Phaser.Scene {
   private onlinePositionAt = 0;
   private onlinePositionPending = false;
   private onlineActionPending = false;
+  private queuedOnlineClick?: { place: boolean; x: number; y: number };
   private peers = new Map<string, Phaser.GameObjects.Sprite>();
   private listeners?: AbortController;
   world!: WorldSystem;
@@ -65,6 +66,7 @@ export class GameScene extends Phaser.Scene {
     this.onlinePositionAt = 0;
     this.onlinePositionPending = false;
     this.onlineActionPending = false;
+    this.queuedOnlineClick = undefined;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.listeners?.abort();
       this.ui?.destroy();
@@ -180,6 +182,7 @@ export class GameScene extends Phaser.Scene {
       this.changed();
     };
     this.keys = this.input.keyboard!.addKeys("A,D,W,SPACE") as typeof this.keys;
+    if (document.querySelector("#online-app:not([hidden])")) this.setOnlineOverlay(true);
     this.follow = this.add.zone(this.player.x, this.player.y - 85, 1, 1);
     const camera = this.cameras.main;
     camera.setBounds(0, 0, GAME.width * 32, GAME.height * 32);
@@ -225,6 +228,19 @@ export class GameScene extends Phaser.Scene {
   private resize() {
     this.cameras.main.setZoom(this.scale.width >= 1900 ? 3 : 2);
   }
+  setOnlineOverlay(open: boolean) {
+    this.held = false;
+    this.queuedOnlineClick = undefined;
+    this.keys?.A.reset();
+    this.keys?.D.reset();
+    this.keys?.W.reset();
+    this.keys?.SPACE.reset();
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+    keyboard.enabled = !open;
+    if (open) keyboard.disableGlobalCapture();
+    else keyboard.enableGlobalCapture();
+  }
   private cursor() {
     const bounds = this.game.canvas.getBoundingClientRect();
     const p = this.cameras.main.getWorldPoint(
@@ -233,24 +249,38 @@ export class GameScene extends Phaser.Scene {
     );
     return { x: Math.floor(p.x / 32), y: Math.floor(p.y / 32) };
   }
-  private interact(place: boolean, now: number) {
-    if (this.paused || now < this.nextHit) return;
-    const { x, y } = this.cursor();
+  private interact(place: boolean, now: number, fromHold = false, target?: { x: number; y: number }) {
+    if (this.paused || document.querySelector("#online-app:not([hidden])") || now < this.nextHit) return;
+    const { x, y } = target ?? this.cursor();
     if (!this.blocks.reachable(x, y)) {
       this.hint("A little closer — reach is about 4 tiles.");
+      return;
+    }
+    if (this.online && this.onlineActionPending) {
+      // Held mining retries on the next frame; retain a separate click to place or mine.
+      if (!fromHold) this.queuedOnlineClick = { place, x, y };
       return;
     }
     this.nextHit = now + GAME.hitDelay;
     this.player.actionUntil = now + 160;
     this.player.facing = x * 32 + 16 >= this.player.x ? 1 : -1;
     if (this.online) {
-      if (this.onlineActionPending) return;
       this.onlineActionPending = true;
-      void this.online.position(this.player.x, this.player.y, this.player.facing)
-        .then(() => this.online!.action(place ? "place" : "hit", x, y, this.inventory.selected))
+      this.worldRenderer.flash(x, y);
+      this.audio.play("hit");
+      void this.online.action(place ? "place" : "hit", x, y, this.inventory.selected,
+        this.player.x, this.player.y, this.player.facing)
         .then(({ data, message }) => { this.applyOnlineSnapshot(data); if (message !== "Keep digging") this.ui.toast(message); })
         .catch((error) => this.ui.toast(error instanceof Error ? error.message : "Action failed"))
-        .finally(() => { this.onlineActionPending = false; });
+        .finally(() => {
+          this.onlineActionPending = false;
+          const queued = this.queuedOnlineClick;
+          this.queuedOnlineClick = undefined;
+          if (queued && !(this.held && !queued.place)) {
+            this.time.delayedCall(Math.max(0, this.nextHit - this.time.now), () =>
+              this.interact(queued.place, this.time.now, false, queued));
+          }
+        });
       return;
     }
     if (place) {
@@ -413,7 +443,7 @@ export class GameScene extends Phaser.Scene {
         Phaser.Input.Keyboard.JustDown(this.keys.SPACE);
       const oldX = this.player.x;
       this.player.update(dt, this.world, direction, jump, now);
-      if (this.online && now - this.onlinePositionAt > 650) {
+      if (this.online && !this.onlineActionPending && now - this.onlinePositionAt > 650) {
         this.onlinePositionAt = now;
         if (!this.onlinePositionPending) {
           this.onlinePositionPending = true;
@@ -434,7 +464,7 @@ export class GameScene extends Phaser.Scene {
         this.held &&
         document.elementFromPoint(this.mouseX, this.mouseY) === this.game.canvas
       )
-        this.interact(false, now);
+        this.interact(false, now, true);
     }
     this.follow.setPosition(this.player.x, this.player.y - 85);
     this.worldRenderer.update(now);

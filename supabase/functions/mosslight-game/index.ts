@@ -80,7 +80,12 @@ Deno.serve(async (request) => {
       if (!Number.isInteger(body.selected) || Number(body.selected) < 0 || Number(body.selected) >= 8) throw new Error("Choose a hotbar slot");
       const profile = structuredClone(current.profile.state);
       profile.selected = Number(body.selected);
-      const applied = applyAction({ world: current.world.state, profile, session,
+      // Older clients update position separately; new clients include it here to avoid a second request.
+      const moved = body.playerX === undefined && body.playerY === undefined && body.facing === undefined
+        ? session
+        : moveSession(session, current.world.state, current.world.seed,
+          Number(body.playerX), Number(body.playerY), Number(body.facing), Date.now());
+      const applied = applyAction({ world: current.world.state, profile, session: moved,
         seed: current.world.seed, kind, x: Number(body.x), y: Number(body.y), now: Date.now(), canBuild: current.canBuild });
       const next = await commit(userId, current, applied.changed ? applied.world : null,
         applied.changed ? applied.profile : null, applied.session, applied.event ? { ...applied.event, actor: userId } : null);

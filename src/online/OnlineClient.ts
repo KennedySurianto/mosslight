@@ -59,6 +59,7 @@ export class OnlineClient {
   }
   async join(worldId: string) {
     const result = await this.invoke<{ data: OnlineSnapshot }>("mosslight-game", { type: "join", worldId });
+    if (this.channel) { await this.client.removeChannel(this.channel); this.channel = undefined; }
     this.snapshot = result.data;
     const me = result.data.profile;
     await this.client.realtime.setAuth((await this.client.auth.getSession()).data.session!.access_token);
@@ -93,14 +94,17 @@ export class OnlineClient {
   }
   async social(action: "request" | "accept" | "remove" | "builder" | "viewer", username: string, worldId?: string) {
     const result = await this.invoke<{ data: OnlineSnapshot }>("mosslight-game", { type: "social", action, username, worldId });
-    this.snapshot = result.data;
+    if (this.snapshot) {
+      this.snapshot.worlds = result.data.worlds;
+      this.snapshot.friends = result.data.friends;
+    }
     return result.data;
   }
   async position(x: number, y: number, facing: number) {
     return this.invoke("mosslight-game", { type: "position", worldId: this.snapshot!.world.id, x, y, facing });
   }
-  async action(kind: "hit" | "place", x: number, y: number, selected: number) {
-    const result = await this.invoke<{ data: OnlineSnapshot; message: string; changed: boolean }>("mosslight-game", { type: "action", worldId: this.snapshot!.world.id, kind, x, y, selected });
+  async action(kind: "hit" | "place", x: number, y: number, selected: number, playerX: number, playerY: number, facing: number) {
+    const result = await this.invoke<{ data: OnlineSnapshot; message: string; changed: boolean }>("mosslight-game", { type: "action", worldId: this.snapshot!.world.id, kind, x, y, selected, playerX, playerY, facing });
     this.snapshot = result.data;
     return result;
   }
