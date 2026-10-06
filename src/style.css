@@ -1333,3 +1333,32 @@ button:active {
     animation: none;
   }
 }
+
+#leave-world { padding: 11px 14px; border: 1px solid #ffffff75; border-radius: 7px; color: #284836; background: #f5f4da9c; backdrop-filter: blur(14px); font-size: 11px; font-weight: 700; }
+#leave-world:hover { background: #fff9df; }
+#online-app[hidden] { display: none; }
+#online-app { position: fixed; inset: 0; z-index: 100; }
+.online-shade { min-height: 100%; padding: 32px 16px; overflow: auto; display: grid; place-items: center; background: #1833289c; backdrop-filter: blur(9px); }
+.online-card { width: min(660px, 100%); max-height: calc(100vh - 64px); overflow: auto; padding: 32px; color: #2d493b; background: linear-gradient(140deg,#f8f5df,#e5ecd6); border: 1px solid #fffae7; border-radius: 14px; box-shadow: 0 22px 85px #10291d7a; }
+.online-card h1 { font: normal 32px Georgia,serif; margin: 10px 0; }
+.online-card h2 { font: normal 22px Georgia,serif; margin: 25px 0 10px; }
+.online-card p { font-size: 12px; line-height: 1.6; color: #60705e; }
+.online-card form:not(.online-inline) { display: grid; gap: 14px; margin: 22px 0 12px; }
+.online-card label { display: grid; gap: 7px; font-size: 11px; font-weight: 700; }
+.online-card input { min-width: 0; width: 100%; padding: 12px 13px; color: #294536; background: #fffbed; border: 1px solid #8a9b754d; border-radius: 6px; outline-color: #628759; font: inherit; }
+.online-card button { padding: 10px 14px; border-radius: 6px; color: #f6f2db; background: #3d644b; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.online-card button:hover { background: #4f7a57; }
+.online-card button:disabled { opacity: .55; cursor: wait; }
+.online-card button.online-text { padding: 6px 0; color: #3e684b; background: transparent; }
+.online-card small { font-size: 10px; color: #7c8a70; }
+.online-error { min-height: 18px; color: #a33f38 !important; }
+.online-head,.online-row,.online-inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.online-row { padding: 12px 0; border-bottom: 1px solid #82936535; }
+.online-row b,.online-row small { display: block; }
+.online-row b { font-size: 13px; }
+.online-row small { margin-top: 4px; }
+.online-row-actions { display: flex; flex-wrap: wrap; gap: 5px; justify-content: end; }
+.online-row-actions button { padding: 7px 9px; }
+.online-inline input { flex: 1; }
+.online-muted { margin: 8px 0; }
+@media(max-width:600px) { .online-card { padding: 23px; } .online-row { align-items: flex-start; } .online-row-actions { max-width: 55%; } #leave-world { padding: 8px; } }

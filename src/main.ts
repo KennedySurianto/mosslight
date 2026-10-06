@@ -1,6 +1,8 @@
 import * as Phaser from "phaser";
 import { BootScene } from "./game/scenes/BootScene";
 import { GameScene } from "./game/scenes/GameScene";
+import { OnlineApp } from "./online/OnlineApp";
+import { onlineConfigured } from "./online/OnlineClient";
 import "./style.css";
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -21,3 +23,4 @@ const game = new Phaser.Game({
 });
 // Development-only access for reproducible gameplay regression tests; removed by Vite in production.
 if (import.meta.env.DEV) Object.assign(window, { __mosslight: game });
+if (onlineConfigured) new OnlineApp(game);

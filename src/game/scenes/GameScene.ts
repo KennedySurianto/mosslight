@@ -10,14 +10,24 @@ import {
 } from "../systems/GuideSystem";
 import { touchingSign } from "../systems/TutorialSystem";
 import { InventorySystem } from "../systems/InventorySystem";
-import { SeedSystem } from "../systems/SeedSystem";
+import { SeedSystem, type TreeData } from "../systems/SeedSystem";
+import type { UpgradeId } from "../data/shop";
 import { SaveSystem, validateSave, type SaveData } from "../systems/SaveSystem";
 import { AudioSystem } from "../systems/AudioSystem";
 import { DropSystem } from "../systems/DropSystem";
 import { BlockSystem } from "../systems/BlockSystem";
 import { WorldRenderer } from "../art/WorldRenderer";
 import { GameUI } from "../ui/GameUI";
+import type { OnlineClient, OnlineSnapshot } from "../../online/OnlineClient";
 export class GameScene extends Phaser.Scene {
+  online?: OnlineClient;
+  onLeaveOnline?: () => void;
+  private onlineWorldRevision = -1;
+  private onlinePositionAt = 0;
+  private onlinePositionPending = false;
+  private onlineActionPending = false;
+  private peers = new Map<string, Phaser.GameObjects.Sprite>();
+  private listeners?: AbortController;
   world!: WorldSystem;
   inventory!: InventorySystem;
   seeds!: SeedSystem;
@@ -49,7 +59,18 @@ export class GameScene extends Phaser.Scene {
     super("Game");
   }
   create() {
-    const saved = this.save.load();
+    this.listeners = new AbortController();
+    this.peers.clear();
+    this.onlineWorldRevision = -1;
+    this.onlinePositionAt = 0;
+    this.onlinePositionPending = false;
+    this.onlineActionPending = false;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.listeners?.abort();
+      this.ui?.destroy();
+      this.scale.off("resize", this.resize, this);
+    });
+    const saved = this.online?.snapshot ? this.onlineSave(this.online.snapshot) : this.save.load();
     this.world = new WorldSystem(
       saved?.seed ?? Math.floor(Math.random() * 2147483647),
       saved?.modifications,
@@ -124,11 +145,12 @@ export class GameScene extends Phaser.Scene {
         save: () => this.changed(),
         backpackOpened: () => this.markGuide("backpack"),
         buy: (id) => this.purchase(id),
+        leaveWorld: this.online ? () => this.onLeaveOnline?.() : undefined,
         shopState: () => ({ gems: this.gems, owned: this.shop.owned }),
         feedback: () => this.audio.play("ui"),
-        export: () => this.exportSave(),
-        import: (file) => void this.importSave(file),
-        reset: () => this.resetWorld(),
+        export: () => this.online ? this.ui.toast("Online worlds are saved to your account.") : this.exportSave(),
+        import: (file) => this.online ? this.ui.toast("Local saves cannot overwrite online worlds.") : void this.importSave(file),
+        reset: () => this.online ? this.ui.toast("Online worlds cannot be reset here.") : this.resetWorld(),
         home: () => {
           this.player.respawn();
           this.changed();
@@ -136,8 +158,12 @@ export class GameScene extends Phaser.Scene {
         },
         sound: (enabled) => {
           this.audio.enabled = enabled;
+          if (this.online) void this.online.profile({ sound: enabled }).catch((e) => this.ui.toast(e.message));
           this.changed();
         },
+        moveInventory: this.online ? (from, to) => {
+          void this.online!.profile({ from, to }).then((snapshot) => this.applyOnlineSnapshot(snapshot)).catch((e) => this.ui.toast(e.message));
+        } : undefined,
         pause: (paused) => {
           this.paused = paused;
           this.held = false;
@@ -161,9 +187,9 @@ export class GameScene extends Phaser.Scene {
     camera.startFollow(this.follow, true, 0.09, 0.09);
     camera.centerOn(this.player.x, this.player.y - 85);
     camera.roundPixels = true;
-    this.scale.on("resize", () => this.resize());
+    this.scale.on("resize", this.resize, this);
     const canvas = this.game.canvas;
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault(), { signal: this.listeners.signal });
     canvas.addEventListener("pointerdown", (e) => {
       if (this.paused) return;
       this.mouseX = e.clientX;
@@ -172,28 +198,29 @@ export class GameScene extends Phaser.Scene {
         this.held = true;
         this.interact(false, this.time.now);
       } else if (e.button === 2) this.interact(true, this.time.now);
-    });
+    }, { signal: this.listeners.signal });
     window.addEventListener("pointermove", (e) => {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
-    });
-    window.addEventListener("pointerup", () => (this.held = false));
+    }, { signal: this.listeners.signal });
+    window.addEventListener("pointerup", () => (this.held = false), { signal: this.listeners.signal });
     window.addEventListener("blur", () => {
       this.held = false;
       this.keys.A.reset();
       this.keys.D.reset();
       this.keys.W.reset();
       this.persist();
-    });
-    window.addEventListener("beforeunload", () => this.persist());
+    }, { signal: this.listeners.signal });
+    window.addEventListener("beforeunload", () => this.persist(), { signal: this.listeners.signal });
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         this.held = false;
         this.persist();
       }
-    });
+    }, { signal: this.listeners.signal });
     if (this.save.error) this.ui.toast(this.save.error);
-    else this.persist();
+    else if (!this.online) this.persist();
+    if (this.online?.snapshot) this.onlineWorldRevision = this.online.snapshot.world.revision;
   }
   private resize() {
     this.cameras.main.setZoom(this.scale.width >= 1900 ? 3 : 2);
@@ -216,6 +243,16 @@ export class GameScene extends Phaser.Scene {
     this.nextHit = now + GAME.hitDelay;
     this.player.actionUntil = now + 160;
     this.player.facing = x * 32 + 16 >= this.player.x ? 1 : -1;
+    if (this.online) {
+      if (this.onlineActionPending) return;
+      this.onlineActionPending = true;
+      void this.online.position(this.player.x, this.player.y, this.player.facing)
+        .then(() => this.online!.action(place ? "place" : "hit", x, y, this.inventory.selected))
+        .then(({ data, message }) => { this.applyOnlineSnapshot(data); if (message !== "Keep digging") this.ui.toast(message); })
+        .catch((error) => this.ui.toast(error instanceof Error ? error.message : "Action failed"))
+        .finally(() => { this.onlineActionPending = false; });
+      return;
+    }
     if (place) {
       const reason = this.blocks.placement(x, y);
       if (reason) {
@@ -333,6 +370,8 @@ export class GameScene extends Phaser.Scene {
   private markGuide(key: keyof GuideProgress) {
     if (!this.guide[key]) {
       this.guide[key] = true;
+      if (this.online && ["moved", "jumped", "backpack"].includes(key))
+        void this.online.profile({ guide: key }).catch(() => {});
       this.changed();
     }
   }
@@ -343,6 +382,14 @@ export class GameScene extends Phaser.Scene {
     this.player.pickupRange = this.shop.owned.includes("magnet") ? 112 : 70;
   }
   private purchase(id: string) {
+    if (this.online) {
+      void this.online.purchase(id).then(({ data, message }) => {
+        this.applyOnlineSnapshot(data);
+        this.ui.shopPanel.refresh(this.gems, this.shop.owned);
+        this.ui.shopPanel.message(message);
+      }).catch((error) => this.ui.shopPanel.message(error instanceof Error ? error.message : "Purchase failed"));
+      return;
+    }
     const result = this.shop.purchase(id, this.gems, this.inventory);
     if (result.ok) {
       this.gems = result.gems;
@@ -366,6 +413,15 @@ export class GameScene extends Phaser.Scene {
         Phaser.Input.Keyboard.JustDown(this.keys.SPACE);
       const oldX = this.player.x;
       this.player.update(dt, this.world, direction, jump, now);
+      if (this.online && now - this.onlinePositionAt > 650) {
+        this.onlinePositionAt = now;
+        if (!this.onlinePositionPending) {
+          this.onlinePositionPending = true;
+          void this.online.position(this.player.x, this.player.y, this.player.facing)
+            .catch(() => {})
+            .finally(() => { this.onlinePositionPending = false; });
+        }
+      }
       if (Math.abs(this.player.x - oldX) > 1) this.markGuide("moved");
       this.drops.update(dt, this.player);
       if (
@@ -408,6 +464,7 @@ export class GameScene extends Phaser.Scene {
         this.save.error,
         this.stats,
         this.guide,
+        !!this.online,
       );
     }
     if (now > this.autosave) {
@@ -485,6 +542,72 @@ export class GameScene extends Phaser.Scene {
             : "";
     this.ui.target(text, this.mouseX, this.mouseY);
   }
+  private onlineSave(data: OnlineSnapshot): SaveData {
+    const profile = data.profile.state;
+    const world = data.world.state;
+    const position = data.session?.state;
+    return {
+      version: 1, seed: data.world.seed,
+      player: { x: position?.x ?? GAME.spawnX * 32 + 16, y: position?.y ?? GAME.surface * 32,
+        facing: position?.facing ?? 1, gems: profile.gems, selected: profile.selected },
+      inventory: profile.inventory, modifications: world.modifications,
+      clearedFoliage: world.clearedFoliage, trees: world.trees, drops: [],
+      settings: { sound: profile.sound }, tutorial: profile.tutorial,
+      stats: profile.stats, upgrades: profile.upgrades as UpgradeId[],
+      guide: profile.guide as unknown as GuideProgress,
+    };
+  }
+  applyOnlineSnapshot(data: OnlineSnapshot) {
+    if (!this.world || data.world.id !== this.online?.snapshot?.world.id) return;
+    if (data.world.revision > this.onlineWorldRevision) {
+      const rebuilt = new WorldSystem(data.world.seed, data.world.state.modifications, data.world.state.clearedFoliage);
+      this.world.tiles.set(rebuilt.tiles);
+      this.world.modifications = rebuilt.modifications;
+      this.world.clearedFoliage = rebuilt.clearedFoliage;
+      this.world.foliage = rebuilt.foliage;
+      this.world.revision++;
+      this.seeds.trees = data.world.state.trees;
+      this.onlineWorldRevision = data.world.revision;
+    }
+    this.inventory.slots = structuredClone(data.profile.state.inventory);
+    this.inventory.selected = data.profile.state.selected;
+    this.gems = data.profile.state.gems;
+    this.shop.owned = data.profile.state.upgrades as UpgradeId[];
+    this.stats = data.profile.state.stats;
+    this.guide = data.profile.state.guide as unknown as GuideProgress;
+    this.tutorial = data.profile.state.tutorial;
+    this.applyUpgrades();
+    this.ui.render();
+    this.ui.status(this.gems, Math.floor(this.player.x / 32), Math.floor(this.player.y / 32), "", this.stats, this.guide, true);
+  }
+  applyOnlineWorldEvent(event: Record<string, unknown>) {
+    if (!this.world || event.actor === this.online?.snapshot?.profile.user_id) return;
+    const x = Number(event.x), y = Number(event.y);
+    if (event.kind === "tile" && Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(event.id)) {
+      this.world.set(x, y, Number(event.id));
+    } else if (event.kind === "foliage" && Number.isInteger(x) && Number.isInteger(y)) {
+      this.world.clearFoliage(x, y);
+    } else if (event.kind === "plant" && event.tree && typeof event.tree === "object") {
+      this.seeds.trees.push(event.tree as TreeData);
+      this.world.revision++;
+    } else if (event.kind === "harvest" && Number.isInteger(x) && Number.isInteger(y)) {
+      this.seeds.trees = this.seeds.trees.filter((t) => t.x !== x || t.y !== y);
+      this.world.revision++;
+    }
+  }
+  updatePeer(userId: string, x: number, y: number, facing: number) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    let sprite = this.peers.get(userId);
+    if (!sprite) {
+      sprite = this.add.sprite(x, y, "player-idle").setOrigin(.5, 1).setScale(.72).setTint(0xb5d7e2).setDepth(9);
+      this.peers.set(userId, sprite);
+    }
+    sprite.setFlipX(facing < 0);
+    this.tweens.add({ targets: sprite, x, y, duration: 450 });
+  }
+  setPeers(ids: string[]) {
+    for (const [id, sprite] of this.peers) if (!ids.includes(id)) { sprite.destroy(); this.peers.delete(id); }
+  }
   snapshot(): SaveData {
     return {
       version: 1,
@@ -509,9 +632,11 @@ export class GameScene extends Phaser.Scene {
     };
   }
   private changed() {
+    if (this.online) return;
     this.save.schedule(() => this.snapshot());
   }
   private persist() {
+    if (this.online) return;
     if (!this.replacingSave && this.world && this.drops)
       this.save.write(this.snapshot());
   }

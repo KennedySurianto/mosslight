@@ -1,0 +1,5 @@
+[functions.mosslight-auth]
+verify_jwt = false # This endpoint validates username/password inside the function.
+
+[functions.mosslight-game]
+verify_jwt = true
