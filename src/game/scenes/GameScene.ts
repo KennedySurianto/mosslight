@@ -405,7 +405,7 @@ export class GameScene extends Phaser.Scene {
   update(now: number, delta: number) {
     if (!this.player) return;
     const dt = Math.min(delta / 1000, 0.04);
-    if (!this.paused && !document.hidden) {
+    if (!this.paused && !document.hidden && !document.querySelector("#online-app:not([hidden])")) {
       const direction =
         (this.keys.D.isDown ? 1 : 0) - (this.keys.A.isDown ? 1 : 0);
       const jump =
