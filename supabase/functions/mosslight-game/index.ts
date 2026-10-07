@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
+import { chatText, chatDuration, worldName } from "../_shared/social.ts";
 import { applyAction, applyShop, moveSession, type ProfileState, type SessionState, type WorldState } from "../_shared/mosslight.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
@@ -14,7 +15,7 @@ function required<T>(result: { data: T; error: { message: string } | null }): T 
 type Snapshot = {
   profile: { user_id: string; username: string; state: ProfileState; revision: number };
   world: { id: string; owner_id: string; name: string; seed: number; state: WorldState; revision: number };
-  session: { state: SessionState } | null;
+  session: { state: SessionState; expires_at: string } | null;
   canBuild: boolean;
   worlds: { id: string; name: string; owner: string; ownerId: string }[];
   friends: { username: string; userId: string; status: string; incoming: boolean }[];
@@ -49,6 +50,25 @@ Deno.serve(async (request) => {
     if (!(await limited(`game:${userId}`, 240, 60))) return reply({ error: "Too many actions; slow down" }, 429);
     const worldId = typeof body.worldId === "string" && /^[0-9a-f-]{36}$/.test(body.worldId) ? body.worldId : undefined;
     if (type === "state") return reply({ data: await state(userId, worldId) });
+    if (type === "players") {
+      const query = typeof body.query === 'string' ? body.query.trim().toLowerCase() : '';
+      const after = typeof body.after === 'string' ? body.after : '';
+      if (!/^[a-z0-9_]{0,20}$/.test(query) || !/^[a-z0-9_]{0,20}$/.test(after)) throw new Error('Use letters, numbers or underscores');
+      if (!(await limited(`search:${userId}`, 60, 60))) return reply({ error: 'Please wait before searching again' }, 429);
+      const rows = required(await admin.rpc('mosslight_players', { p_user: userId, p_query: query, p_after: after })) as { username: string }[];
+      return reply({ players: rows.slice(0,20), next: rows.length>20 ? rows[19].username : null });
+    }
+    if (type === 'locations') return reply({ locations: required(await admin.rpc('mosslight_locations', { p_user: userId })) });
+    if (type === 'roster') {
+      if (!worldId) throw new Error('Choose a world');
+      return reply({ players: required(await admin.rpc('mosslight_room_players', { p_user: userId, p_world: worldId })) });
+    }
+    if (type === 'rename') {
+      if (!worldId) throw new Error('Choose a world');
+      const name = worldName(body.name);
+      if (!(await limited(`rename:${userId}`, 6, 60))) return reply({ error: 'Please wait before renaming again' }, 429);
+      return reply({ name: required(await admin.rpc('mosslight_rename', { p_user: userId, p_world: worldId, p_name: name })) });
+    }
     if (type === "join") {
       if (!worldId) throw new Error("Choose a world");
       return reply({ data: required(await admin.rpc("mosslight_join", { p_user: userId, p_world: worldId })) });
@@ -65,8 +85,20 @@ Deno.serve(async (request) => {
       return reply({ data: required(await admin.rpc("mosslight_social", { p_user: userId, p_action: action, p_target: username, p_world: worldId ?? null })) });
     }
     const current = await state(userId, worldId);
-    if (!current.session) throw new Error("Join this world first");
+    if (!current.session || Date.parse(current.session.expires_at) <= Date.now()) throw new Error("World session expired; join again");
     const session = current.session.state;
+    if (type === 'chat') {
+      const text = chatText(body.text);
+      if (!(await limited(`chat:${userId}`, 1, 2))) return reply({ error: 'Wait two seconds between messages' }, 429);
+      // Broadcast through the HTTP API: unlike realtime.send, message content is not inserted into Postgres.
+      const payload = { userId, username: current.profile.username, text, expiresAt: Date.now()+chatDuration(text) };
+      const response = await fetch(`${url}/realtime/v1/api/broadcast`, {
+        method:'POST', headers:{ apikey:secret, Authorization:`Bearer ${secret}`, 'Content-Type':'application/json' },
+        body:JSON.stringify({ messages:[{ topic:`mosslight:${current.world.id}`, event:'chat', payload, private:true }] }),
+      });
+      if (!response.ok) throw new Error('Message could not be delivered');
+      return reply({ message:payload });
+    }
     if (type === "position") {
       const x = Number(body.x), y = Number(body.y), facing = Number(body.facing);
       const next = moveSession(session, current.world.state, current.world.seed, x, y, facing, Date.now());

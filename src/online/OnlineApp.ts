@@ -1,4 +1,5 @@
 import type * as Phaser from "phaser";
+import { PlayerDirectory } from "./PlayerDirectory";
 import type { GameScene } from "../game/scenes/GameScene";
 import { OnlineClient, type OnlineSnapshot } from "./OnlineClient";
 
@@ -7,6 +8,7 @@ const escape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp
 export class OnlineApp {
   private client = new OnlineClient();
   private root = document.createElement("div");
+  private directory?: PlayerDirectory;
   private busy = false;
   private mode: "login" | "register" = "login";
   private activeWorldId?: string;
@@ -16,7 +18,8 @@ export class OnlineApp {
     document.body.append(this.root);
     this.client.onWorldEvent = (event) => this.scene().applyOnlineWorldEvent(event);
     this.client.onPeerMove = (userId, payload) => this.scene().updatePeer(userId, Number(payload.x), Number(payload.y), Number(payload.facing));
-    this.client.onPresence = (players) => this.scene().setPeers(players.map((p) => p.userId));
+    this.client.onPresence = (players) => this.scene()?.setPeers(players);
+    this.client.onChat = (message) => this.scene()?.showChat(message);
     void this.start();
   }
   private scene() { return this.game.scene.getScene("Game") as GameScene; }
@@ -43,7 +46,7 @@ export class OnlineApp {
     try { await action(); } catch (error) {
       this.error(error instanceof Error ? error.message : "Something went wrong");
       this.root.querySelectorAll<HTMLButtonElement>("button").forEach((button) => button.disabled = false);
-    } finally { this.busy = false; }
+    } finally { this.busy = false; this.root.querySelectorAll<HTMLButtonElement>("button").forEach(button => button.disabled = false); }
   }
   private auth() {
     const register = this.mode === "register";
@@ -59,32 +62,21 @@ export class OnlineApp {
     });
   }
   private lobby(data = this.client.snapshot!) {
-    const own = data.worlds.find((world) => world.ownerId === data.profile.user_id);
-    const worlds = data.worlds.map((world) => `<article class="online-row"><div><b>${escape(world.name)}</b><small>by ${escape(world.owner)}${world.id === own?.id ? " · Your world" : ""}</small></div><button data-world="${world.id}">Visit ↗</button></article>`).join("");
-    const friends = data.friends.map((friend) => `<article class="online-row"><div><b>${escape(friend.username)}</b><small>${friend.status === "accepted" ? "Friend" : friend.incoming ? "Wants to be friends" : "Request sent"}</small></div><div class="online-row-actions">${friend.incoming && friend.status !== "accepted" ? `<button data-social="accept" data-name="${escape(friend.username)}">Accept</button>` : ""}<button data-social="remove" data-name="${escape(friend.username)}">Remove</button>${friend.status === "accepted" && own ? `<button data-social="builder" data-name="${escape(friend.username)}" data-world-id="${own.id}" title="Let this friend build in your world">Allow building</button>` : ""}</div></article>`).join("");
-    this.set(`<div class="online-head"><div><span class="eyebrow">Mosslight · Online</span><h1>Hello, ${escape(data.profile.username)}.</h1></div>${this.activeWorldId ? '<button id="close-worlds" class="online-close" aria-label="Close Worlds" title="Return to your world">×</button>' : ""}</div><p>Choose a world, visit friends, and make the meadow your own.</p><h2>Worlds</h2><div class="online-list">${worlds || "Your first world is growing..."}</div><h2>Friends</h2><form id="friend-request" class="online-inline"><input name="username" placeholder="Friend's username" maxlength="20" required><button>Send request</button></form><div class="online-list">${friends || '<p class="online-muted">No friends yet. Send someone a request above.</p>'}</div><p class="online-error" role="alert"></p><footer class="online-footer"><button id="logout" class="online-text">Log out</button></footer>`);
-    this.root.querySelector("#close-worlds")?.addEventListener("click", () => this.closeWorlds());
-    this.root.querySelector("#logout")!.addEventListener("click", () => void this.run(async () => {
-      await this.client.signOut();
-      window.clearInterval(this.overlayHeartbeat);
-      this.overlayHeartbeat = undefined;
-      this.activeWorldId = undefined;
-      this.game.scene.stop("Game");
-      this.mode = "login";
-      this.auth();
+    this.directory?.destroy();
+    const own = data.worlds.find(world => world.ownerId === data.profile.user_id);
+    this.set(`<div class="online-head"><div><span class="eyebrow">Mosslight · Online</span><h1>Hello, ${escape(data.profile.username)}.</h1></div>${this.activeWorldId ? '<button id="close-worlds" class="online-close" aria-label="Close Worlds" title="Return to your world">×</button>' : ''}</div><p>One world of your own. A whole meadow of friends.</p>${own ? `<details class="player-card" open><summary><b>Your world</b><span aria-hidden="true">⌄</span></summary><div class="online-row"><b>${escape(own.name)}</b><button id="visit-own">Visit ↗</button></div></details>` : ''}<section id="player-directory"></section><p class="online-error" role="alert"></p><footer class="online-footer"><button id="logout" class="online-text">Log out</button></footer>`);
+    const visit = (id: string) => {
+      if (id === this.activeWorldId) this.closeWorlds();
+      else void this.run(async () => { await this.enter(id); });
+    };
+    this.root.querySelector('#visit-own')?.addEventListener('click', () => own && visit(own.id));
+    this.root.querySelector('#close-worlds')?.addEventListener('click', () => this.closeWorlds());
+    this.root.querySelector('#logout')!.addEventListener('click', () => void this.run(async () => {
+      await this.client.signOut(); this.directory?.destroy();
+      window.clearInterval(this.overlayHeartbeat); this.overlayHeartbeat = undefined;
+      this.activeWorldId = undefined; this.game.scene.stop('Game'); this.mode='login'; this.auth();
     }));
-    this.root.querySelectorAll<HTMLButtonElement>("[data-world]").forEach((button) => button.addEventListener("click", () => {
-      if (button.dataset.world === this.activeWorldId) this.closeWorlds();
-      else void this.run(async () => { await this.enter(button.dataset.world!); });
-    }));
-    this.root.querySelector("#friend-request")!.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const name = String(new FormData(event.target as HTMLFormElement).get("username"));
-      void this.run(async () => { this.lobby(await this.client.social("request", name)); });
-    });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-social]").forEach((button) => button.addEventListener("click", () => void this.run(async () => {
-      this.lobby(await this.client.social(button.dataset.social as "accept" | "remove" | "builder", button.dataset.name!, button.dataset.worldId));
-    })));
+    this.directory = new PlayerDirectory(this.root.querySelector('#player-directory')!,this.client,visit);
   }
   private async enter(worldId: string) {
     const snapshot: OnlineSnapshot = await this.client.join(worldId);
@@ -103,9 +95,10 @@ export class OnlineApp {
     this.overlayHeartbeat = window.setInterval(() => {
       const player = this.scene().player;
       if (player && !this.root.hidden) void this.client.position(player.x, player.y, player.facing).catch(() => {});
-    }, 120_000);
+    }, 10_000);
   }
   private closeWorlds() {
+    this.directory?.destroy();
     window.clearInterval(this.overlayHeartbeat);
     this.overlayHeartbeat = undefined;
     this.root.hidden = true;
