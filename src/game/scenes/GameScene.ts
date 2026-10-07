@@ -12,7 +12,7 @@ import { touchingSign } from "../systems/TutorialSystem";
 import { InventorySystem } from "../systems/InventorySystem";
 import { SeedSystem, type TreeData } from "../systems/SeedSystem";
 import type { UpgradeId } from "../data/shop";
-import { SaveSystem, validateSave, type SaveData } from "../systems/SaveSystem";
+import { SaveSystem, type SaveData } from "../systems/SaveSystem";
 import { AudioSystem } from "../systems/AudioSystem";
 import { DropSystem } from "../systems/DropSystem";
 import { BlockSystem } from "../systems/BlockSystem";
@@ -164,8 +164,6 @@ export class GameScene extends Phaser.Scene {
         leaveWorld: this.online ? () => this.onLeaveOnline?.() : undefined,
         shopState: () => ({ gems: this.gems, owned: this.shop.owned }),
         feedback: () => this.audio.play("ui"),
-        export: () => this.online ? this.ui.toast("Online worlds are saved to your account.") : this.exportSave(),
-        import: (file) => this.online ? this.ui.toast("Local saves cannot overwrite online worlds.") : void this.importSave(file),
         reset: () => this.online ? this.ui.toast("Online worlds cannot be reset here.") : this.resetWorld(),
         home: () => {
           this.player.respawn();
@@ -853,27 +851,6 @@ export class GameScene extends Phaser.Scene {
     if (this.online) return;
     if (!this.replacingSave && this.world && this.drops)
       this.save.write(this.snapshot());
-  }
-  private exportSave() {
-    const data = JSON.stringify(this.snapshot(), null, 2),
-      url = URL.createObjectURL(new Blob([data], { type: "application/json" })),
-      a = document.createElement("a");
-    a.href = url;
-    a.download = `mosslight-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    this.ui.toast("A little world, safely packed.");
-  }
-  private async importSave(file: File) {
-    try {
-      if (file.size > 2_000_000) throw new Error("Save file is too large.");
-      const data = validateSave(JSON.parse(await file.text()));
-      this.applySave(data);
-    } catch (e) {
-      this.ui.toast(
-        e instanceof Error ? e.message : "Could not read that save.",
-      );
-    }
   }
   private applySave(data: SaveData) {
     if (!this.save.write(data)) {

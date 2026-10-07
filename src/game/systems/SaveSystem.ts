@@ -186,7 +186,7 @@ export class SaveSystem {
       return true;
     } catch {
       this.error =
-        "Browser storage is unavailable or full. Export your world to keep it safe.";
+        "Browser storage is unavailable or full. Your solo world cannot be saved on this device.";
       return false;
     }
   }
