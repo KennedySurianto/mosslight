@@ -197,7 +197,7 @@ describe("save validation and recovery", () => {
     const save = new SaveSystem();
     expect(save.load()).toBeNull();
     expect(save.write(fixture())).toBe(false);
-    expect(save.error).toContain("Export");
+    expect(save.error).toContain("cannot be saved");
     vi.unstubAllGlobals();
   });
 });

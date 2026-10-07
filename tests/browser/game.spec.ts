@@ -255,7 +255,7 @@ test("drag drawer and move, swap, merge stacks without punching behind UI", asyn
   await page.keyboard.press("e");
   await expect(page.locator("#inventory")).not.toHaveClass(/open/);
 });
-test("plant, actual offline growth, harvest, gems, export, import validation, reset confirmation", async ({
+test("plant, actual offline growth, harvest, gems, and reset confirmation", async ({
   page,
 }) => {
   await page.keyboard.press("3");
@@ -281,24 +281,7 @@ test("plant, actual offline growth, harvest, gems, export, import validation, re
   await page.waitForTimeout(800);
   expect((await state(page)).player.gems).toBeGreaterThan(0);
   await page.keyboard.press("Escape");
-  const download = page.waitForEvent("download");
-  await page.locator("#export").click();
-  const d = await download;
-  const path = await d.path();
-  expect(path).toBeTruthy();
-  await page.locator("#save-file").setInputFiles({
-    name: "bad.json",
-    mimeType: "application/json",
-    buffer: Buffer.from('{"version":8}'),
-  });
-  await expect(page.locator("#toast")).toContainText("Unsupported");
-  const before = await state(page);
-  await page.locator("#save-file").setInputFiles(path!);
-  await page.waitForFunction(
-    () => !!window.__mosslight?.scene.getScene("Game")?.ui,
-  );
-  expect((await state(page)).inventory).toEqual(before.inventory);
-  await page.keyboard.press("Escape");
+  await expect(page.locator("#export, #import, #save-file")).toHaveCount(0);
   await page.locator("#reset").click();
   await expect(page.locator("#confirm-reset")).toBeVisible();
   await page.locator("#cancel-reset").click();
@@ -380,7 +363,7 @@ test("bulk breaking yields resources, seeds and gems without walking to the drop
   expect((await state(page)).player.x).toBe(startX);
 });
 
-test("corrupt save recovery keeps a backup and unsupported imports leave the world intact", async ({
+test("corrupt save recovery keeps a backup and starts a safe world", async ({
   page,
 }) => {
   await page.goto("about:blank");
@@ -401,17 +384,6 @@ test("corrupt save recovery keeps a backup and unsupported imports leave the wor
     await page.evaluate(() => localStorage.getItem("mosslight_save_v1_backup")),
   ).toBe("{broken");
   expect((await state(page)).inventory[0]?.count).toBe(15);
-  await page.keyboard.press("Escape");
-  const before = await state(page);
-  await page.locator("#save-file").setInputFiles({
-    name: "corrupt.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(
-      JSON.stringify({ ...before, inventory: [{ id: "dirt", count: -99 }] }),
-    ),
-  });
-  await expect(page.locator("#toast")).toContainText("Invalid inventory");
-  expect((await state(page)).inventory).toEqual(before.inventory);
 });
 
 test("player crosses a one-tile-high tunnel with a one-tile-sized sprite", async ({

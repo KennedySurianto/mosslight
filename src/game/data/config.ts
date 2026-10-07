@@ -188,7 +188,7 @@ export const SIGNS = [
     x: 45,
     title: "Your world remembers.",
     label: "06 / SAVE",
-    body: "Your progress saves in this browser. Export a backup from settings to take your world with you.",
+    body: "Your progress saves automatically. In solo mode, it stays in this browser; online, it syncs to your account.",
     keys: "ESC  ·  SETTINGS",
   },
 ];

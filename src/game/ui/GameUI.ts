@@ -8,8 +8,6 @@ export interface UIActions {
   feedback: () => void;
   save: () => void;
   backpackOpened: () => void;
-  export: () => void;
-  import: (file: File) => void;
   reset: () => void;
   home: () => void;
   sound: (enabled: boolean) => void;
@@ -47,7 +45,7 @@ export class GameUI {
   <div class="bottom-hints"><div><kbd>A</kbd><kbd>D</kbd> move <span>·</span> <kbd>W</kbd> jump</div><small>LEFT CLICK <b>break</b><span> / </span>RIGHT CLICK <b>build</b></small></div>
   <div class="world-status"><span id="save-status"><i></i> Saved in this browser</span><small id="coordinates">MEADOW · 19, 23</small></div>
   <section id="inventory" class="inventory"><button id="inventory-handle" class="inventory-handle" aria-label="Drag up to open backpack" aria-expanded="false"><span></span><b>BACKPACK</b><i>⌃</i></button><div class="hotbar-label"><span id="selected-name">Earth</span><small>1–8 TO SELECT</small></div><div id="hotbar" class="slot-grid hotbar"></div><div class="backpack"><div class="backpack-heading"><div><span class="eyebrow">THE THINGS YOU FIND</span><h2>Your backpack</h2></div><span id="capacity"></span></div><div id="pack-grid" class="slot-grid pack-grid"></div><footer>Drag to move · Drop on a matching stack to combine <kbd>E</kbd> to close</footer></div></section>
-  <div id="modal-overlay" class="modal-overlay hidden"><section class="menu" role="dialog" aria-modal="true" aria-labelledby="menu-title"><span class="eyebrow">TAKE A BREATHER</span><h2 id="menu-title">Your little world.</h2><p>Right here when you get back.</p><button id="resume" class="primary">Back to the meadow <span>↗</span></button><button id="home">Return to the white door <span>⌂</span></button><button id="export">Export save <span>↓</span></button><button id="import">Import save <span>↑</span></button><button id="menu-sound">Sound <span>${sound ? "ON" : "OFF"}</span></button><div class="menu-divider"></div><button id="reset" class="danger">Reset world <span>↺</span></button><p class="menu-note">Only on this device. Export a little backup.</p><div id="confirm-reset" class="confirm hidden"><h3>Reset your world?</h3><p>All blocks, inventory, gems, and progress will be deleted.</p><button id="cancel-reset">Keep my world</button><button id="do-reset" class="danger">Yes, reset everything</button></div></section></div><input type="file" id="save-file" accept="application/json,.json" hidden/>`;
+  <div id="modal-overlay" class="modal-overlay hidden"><section class="menu" role="dialog" aria-modal="true" aria-labelledby="menu-title"><span class="eyebrow">TAKE A BREATHER</span><h2 id="menu-title">Your little world.</h2><p>Right here when you get back.</p><button id="resume" class="primary">Back to the meadow <span>↗</span></button><button id="home">Return to the white door <span>⌂</span></button><button id="menu-sound">Sound <span>${sound ? "ON" : "OFF"}</span></button><div class="menu-divider"></div><button id="reset" class="danger">Reset world <span>↺</span></button><p class="menu-note">${actions.leaveWorld ? "Your world syncs to your account." : "Your world saves in this browser."}</p><div id="confirm-reset" class="confirm hidden"><h3>Reset your world?</h3><p>All blocks, inventory, gems, and progress will be deleted.</p><button id="cancel-reset">Keep my world</button><button id="do-reset" class="danger">Yes, reset everything</button></div></section></div>`;
     this.shopPanel = new ShopPanel(this.root, actions.buy, (open) => {
       this.paused = open;
       actions.pause(open);
@@ -93,10 +91,6 @@ export class GameUI {
       actions.home();
       this.togglePause(false);
     });
-    on("export", actions.export);
-    on("import", () =>
-      this.root.querySelector<HTMLInputElement>("#save-file")!.click(),
-    );
     on("reset", () =>
       this.root.querySelector("#confirm-reset")!.classList.remove("hidden"),
     );
@@ -114,14 +108,6 @@ export class GameUI {
     };
     on("sound", toggleSound);
     on("menu-sound", toggleSound);
-    this.root
-      .querySelector<HTMLInputElement>("#save-file")!
-      .addEventListener("change", (e) => {
-        const el = e.target as HTMLInputElement;
-        const file = el.files?.[0];
-        if (file) actions.import(file);
-        el.value = "";
-      });
     const handle =
       this.root.querySelector<HTMLButtonElement>("#inventory-handle")!;
     handle.addEventListener("pointerdown", (e) => {
@@ -343,7 +329,7 @@ export class GameUI {
         y > 31 ? "There is more beneath the surface" : "A place to begin";
     }
     this.root.querySelector("#save-status")!.innerHTML = error
-      ? "Export to keep your progress"
+      ? "Saving is unavailable on this device"
       : online ? "<i></i> Synced online" : "<i></i> Saved in this browser";
     const steps = guideSteps(guide, stats),
       key = steps.map((s) => `${s.done}:${s.help}`).join("|");
