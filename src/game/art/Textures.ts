@@ -116,6 +116,23 @@ export function createTextures(scene: Phaser.Scene) {
     rect(c, "#45af94", 9, 5, 3, 10);
     rect(c, "#9ce3b7", 6, 14, 4, 3);
   });
+  make("worlds-icon", 20, 20, (c) => {
+    rect(c, "#284b38", 2, 8, 16, 10);
+    rect(c, "#81aa6c", 3, 7, 14, 10);
+    rect(c, "#c8e2a1", 5, 4, 10, 4);
+    rect(c, "#46744e", 8, 11, 4, 6);
+    rect(c, "#f7e8a6", 5, 10, 2, 2);
+    rect(c, "#f7e8a6", 13, 10, 2, 2);
+    rect(c, "#e8d390", 7, 2, 6, 2);
+  });
+  make("chat-icon", 20, 20, (c) => {
+    rect(c, "#284b38", 2, 3, 16, 12);
+    rect(c, "#e9f0d3", 3, 3, 14, 10);
+    rect(c, "#72a279", 4, 5, 12, 7);
+    rect(c, "#e9f0d3", 5, 8, 10, 2);
+    rect(c, "#284b38", 5, 14, 3, 3);
+    rect(c, "#72a279", 6, 13, 3, 3);
+  });
   make("door", 48, 76, (c) => {
     rect(c, "#466959", 2, 69, 44, 7);
     rect(c, "#aab4a0", 5, 66, 38, 7);

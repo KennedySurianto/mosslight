@@ -13,7 +13,7 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 export const onlineConfigured = !!url && !!key;
 export type Peer = { userId: string; username: string; x: number; y: number; facing: number };
-export type PlayerResult = { userId: string; username: string; status: string; incoming: boolean; world: { id: string; name: string } | null };
+export type PlayerResult = { userId: string; username: string; status: string; incoming: boolean; canBuild: boolean; world: { id: string; name: string } | null };
 export type PlayerLocation = { worldId: string; name: string; own: boolean; owner: string } | null;
 export type ChatMessage = { userId: string; username: string; text: string; expiresAt: number };
 export class OnlineClient {

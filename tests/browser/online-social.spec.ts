@@ -19,8 +19,8 @@ test('shared avatars, chat, cracks, naming, directory, and departure', async ({ 
     await pa.locator('#visit-own').click();
     await expect(pa.locator('#online-app')).toBeHidden();
     await pb.locator('#player-search').fill(process.env.MOSSLIGHT_QA_A!);
-    const friend=pb.locator('.player-card').filter({has:pb.locator(`summary b`,{hasText:process.env.MOSSLIGHT_QA_A!})});
-    await friend.locator('summary').click(); await friend.getByRole('button',{name:'Visit ↗'}).click();
+    const friend=pb.locator('.player-card').filter({has:pb.locator(`.player-card-head b`,{hasText:process.env.MOSSLIGHT_QA_A!})});
+    await friend.getByRole('button',{name:'Visit ↗'}).click();
     await expect(pb.locator('#online-app')).toBeHidden();
     await expect.poll(()=>pa.evaluate(()=> (window as any).__mosslight.scene.getScene('Game').peers.size),{timeout:20000}).toBe(1);
     await expect.poll(()=>pb.evaluate(()=> (window as any).__mosslight.scene.getScene('Game').peers.size),{timeout:20000}).toBe(1);
