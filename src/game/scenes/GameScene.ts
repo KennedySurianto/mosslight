@@ -21,7 +21,7 @@ import { GameUI } from "../ui/GameUI";
 import type { OnlineClient, OnlineSnapshot } from "../../online/OnlineClient";
 import type { Peer, ChatMessage } from '../../online/OnlineClient';
 import { WorldHud } from '../../online/WorldHud';
-import { spinWheel, type WheelResult } from '../../../supabase/functions/_shared/mosslight';
+import { spinWheel, type ProfileState, type WheelResult } from '../../../supabase/functions/_shared/mosslight';
 export class GameScene extends Phaser.Scene {
   online?: OnlineClient;
   onLeaveOnline?: () => void;
@@ -302,12 +302,18 @@ export class GameScene extends Phaser.Scene {
     this.player.actionUntil = now + 160;
     this.player.facing = x * 32 + 16 >= this.player.x ? 1 : -1;
     if (this.online) {
+      const before = structuredClone(this.online.snapshot!.profile.state);
       this.onlineActionPending = true;
       this.worldRenderer.flash(x, y);
       this.audio.play("hit");
       void this.online.action(place ? "place" : "hit", x, y, this.inventory.selected,
         this.player.x, this.player.y, this.player.facing)
-        .then(({ data, message }) => { this.applyOnlineSnapshot(data); if (message !== "Keep digging") this.ui.toast(message); })
+        .then(({ data, message }) => {
+          this.applyOnlineSnapshot(data);
+          if (message === "Block broken" || message === "Tree harvested")
+            this.showOnlinePickup(x, y, before, data.profile.state);
+          if (message !== "Keep digging") this.ui.toast(message);
+        })
         .catch((error) => this.ui.toast(error instanceof Error ? error.message : "Action failed"))
         .finally(() => {
           this.onlineActionPending = false;
@@ -751,6 +757,22 @@ export class GameScene extends Phaser.Scene {
     const key = `${x},${y}`;
     this.wheelResults.get(key)?.destroy();
     this.wheelResults.delete(key);
+  }
+  private showOnlinePickup(x: number, y: number, before: ProfileState, after: ProfileState) {
+    const total = (profile: ProfileState, id: keyof typeof ITEMS) =>
+      profile.inventory.reduce((count, slot) => count + (slot?.id === id ? slot.count : 0), 0);
+    let shown = false;
+    for (const id of Object.keys(ITEMS) as (keyof typeof ITEMS)[]) {
+      if (total(after, id) > total(before, id)) {
+        this.drops.visualPickup(x * 32 + 16, y * 32 + 12, id, this.player);
+        shown = true;
+      }
+    }
+    if (after.gems > before.gems) {
+      this.drops.visualPickup(x * 32 + 16, y * 32 + 8, "gem", this.player);
+      shown = true;
+    }
+    if (shown) this.audio.play(after.gems > before.gems ? "gem" : "pickup");
   }
   setPeers(players: Peer[]) {
     if (!this.player) return;

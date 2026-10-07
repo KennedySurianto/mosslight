@@ -45,6 +45,39 @@ test.beforeEach(async ({ page }) => {
     () => !!window.__mosslight?.scene.getScene("Game")?.ui,
   );
 });
+test("slash opens chat, closes an empty draft, and stays usable in a message", async ({ page }) => {
+  await page.evaluate(async () => {
+    const { WorldHud } = await import('../../src/online/WorldHud');
+    const scene = window.__mosslight.scene.getScene('Game');
+    const client = { snapshot: { world: { owner_id: 'me', name: 'The First Meadow' }, profile: { user_id: 'me' } }, chat: async () => {} };
+    new WorldHud(scene.ui.root, client as any, open => scene.setOnlineOverlay(open), () => {});
+  });
+  await page.keyboard.press('/');
+  await expect(page.locator('#world-chat')).toBeVisible();
+  await expect(page.locator('#chat-message')).toBeFocused();
+  await page.keyboard.press('/');
+  await expect(page.locator('#world-chat')).toBeHidden();
+  await page.keyboard.press('/');
+  await page.locator('#chat-message').fill('hello');
+  await page.keyboard.press('/');
+  await expect(page.locator('#chat-message')).toHaveValue('hello/');
+  await expect(page.locator('#world-chat')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#world-chat')).toBeHidden();
+});
+test("a new drop immediately flies to a stationary player and is collected", async ({ page }) => {
+  const start = await page.evaluate(() => {
+    const scene = window.__mosslight.scene.getScene('Game');
+    scene.drops.spawn(scene.player.x + 96, scene.player.y - 28, 'wood');
+    return { x: scene.drops.drops[0].x, wood: scene.inventory.slots.find(s => s?.id === 'wood')?.count };
+  });
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.__mosslight.scene.getScene('Game').drops.drops[0]?.x)).toBeLessThan(start.x);
+  await expect.poll(() => page.evaluate(() => {
+    const scene = window.__mosslight.scene.getScene('Game');
+    return { remaining: scene.drops.drops.length, wood: scene.inventory.slots.find(s => s?.id === 'wood')?.count };
+  })).toEqual({ remaining: 0, wood: (start.wood ?? 0) + 1 });
+});
 test("casino wheel costs five gems, spins on click, and breaks when held", async ({ page }) => {
   await page.evaluate(() => {
     const scene = window.__mosslight.scene.getScene("Game");
@@ -320,9 +353,10 @@ test("solid walls stop movement, jumps clear blocks, pause freezes motion, retur
   expect((await state(page)).player.y).toBe(736);
 });
 
-test("bulk breaking yields configured resources, seeds and gems; nearby drops collect", async ({
+test("bulk breaking yields resources, seeds and gems without walking to the drops", async ({
   page,
 }) => {
+  const startX = (await state(page)).player.x;
   // Exercise the real hit/drop path with a deterministic RNG and isolated target.
   await page.evaluate(() => {
     let seed = 912;
@@ -340,16 +374,10 @@ test("bulk breaking yields configured resources, seeds and gems; nearby drops co
     await aim(page, 22, 22);
     await aim(page, 22, 22);
   }
-  const drops = (await state(page)).drops;
-  expect(drops.some((d) => d.id === "dirt")).toBe(true);
-  expect(drops.some((d) => d.id === "seed")).toBe(true);
-  expect(drops.some((d) => d.id === "gem")).toBe(true);
-  await page.keyboard.down("d");
-  await page.waitForTimeout(480);
-  await page.keyboard.up("d");
-  await page.waitForTimeout(1600);
-  expect((await state(page)).inventory[0]!.count).toBeGreaterThan(15);
-  expect((await state(page)).player.gems).toBeGreaterThan(0);
+  await expect.poll(async () => (await state(page)).inventory[0]!.count).toBeGreaterThan(15);
+  await expect.poll(async () => (await state(page)).inventory.find(s => s?.id === "seed")?.count ?? 0).toBeGreaterThan(3);
+  await expect.poll(async () => (await state(page)).player.gems).toBeGreaterThan(0);
+  expect((await state(page)).player.x).toBe(startX);
 });
 
 test("corrupt save recovery keeps a backup and unsupported imports leave the world intact", async ({
