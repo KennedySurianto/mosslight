@@ -1336,6 +1336,8 @@ button:active {
 
 #leave-world { padding: 11px 14px; border: 1px solid #ffffff75; border-radius: 7px; color: #284836; background: #f5f4da9c; backdrop-filter: blur(14px); font-size: 11px; font-weight: 700; }
 #leave-world:hover { background: #fff9df; }
+#open-chat { padding: 11px 14px; border: 1px solid #ffffff75; border-radius: 7px; color: #284836; background: #f5f4da9c; backdrop-filter: blur(14px); font-size: 11px; font-weight: 700; cursor: pointer; }
+#open-chat:hover { background: #fff9df; }
 #online-app[hidden] { display: none; }
 #online-app { position: fixed; inset: 0; z-index: 100; }
 .online-shade { min-height: 100%; padding: 32px 16px; overflow: auto; display: grid; place-items: center; background: #1833289c; backdrop-filter: blur(9px); }
@@ -1366,3 +1368,32 @@ button:active {
 .online-inline input { flex: 1; }
 .online-muted { margin: 8px 0; }
 @media(max-width:600px) { .online-card { padding: 23px; } .online-row { align-items: flex-start; } .online-row-actions { max-width: 55%; } #leave-world { padding: 8px; } }
+/* Shared-world social controls use the meadow's glass and warm paper palette. */
+#world-name { font: inherit; font-weight: 700; color: inherit; padding: 0; border: 0; background: none; text-align: left; max-width: 260px; overflow-wrap: anywhere; }
+button#world-name { cursor: pointer; }
+button#world-name:hover { text-decoration: underline dotted; text-underline-offset: 4px; }
+#world-name-input { width: min(260px, 30vw); padding: 5px 8px; color: #263b2c; background: #f5f3dfe6; border: 1px solid #6b876c; border-radius: 7px; font: inherit; }
+#world-chat { position: absolute; top: 94px; right: 24px; width: min(430px, calc(100vw - 32px)); padding: 18px; border-radius: 16px; background: #f5f0dfde; backdrop-filter: blur(18px); border: 1px solid #fff9eaaa; box-shadow: 0 8px 30px #253c2926; color: #293f2e; pointer-events: auto; z-index: 65; }
+#world-chat[hidden] { display: none; }
+#world-chat label { display: block; font-weight: 700; margin-bottom: 10px; }
+#world-chat > div { display: flex; gap: 8px; }
+#world-chat input { min-width: 0; flex: 1; padding: 10px; border: 1px solid #80997b; border-radius: 8px; background: #fffcefaa; color: inherit; }
+#world-chat button { padding: 8px; border-radius: 8px; background: #d5e2c4; border: 1px solid #a5b798; cursor: pointer; }
+#world-chat small { display: block; margin-top: 8px; opacity: .75; }
+#world-chat p { margin: 6px 0 0; color: #854738; }
+.player-card { border: 1px solid #a7b69c88; border-radius: 12px; margin: 10px 0; overflow: hidden; background: #fff9e547; }
+.player-card summary { cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 14px; list-style: none; }
+.player-card summary > span:first-child { flex: 1; }
+.player-card summary small { display: block; font-size: 12px; opacity: .8; }
+.player-card summary > b { flex: 1; }
+.player-card summary:hover { background: #c5d7b34d; }
+.player-card[open] summary { border-bottom: 1px solid #a7b69c55; }
+.player-world { padding: 0 14px 14px; }
+.player-location { max-width: 48%; text-align: right; overflow-wrap: anywhere; }
+.player-search-label { display: block; font-weight: 600; }
+.player-search-label input { display: block; width: 100%; margin: 8px 0; }
+.directory-more { display: block; margin: 14px auto; }
+.directory-more[hidden] { display: none; }
+.directory-error { color: #854738; }
+.player-world .online-row-actions { flex-wrap: wrap; }
+@media (max-width: 760px) { .hud .location { display: block; max-width: 30vw; } .hud .location-icon, .hud .location small { display: none; } #world-name { max-width: 28vw; font-size: 12px; } .hud-actions { gap: 4px; } #world-chat { top: 88px; right: 16px; } }

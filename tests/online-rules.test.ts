@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { chatText, chatDuration, worldName } from '../supabase/functions/_shared/social';
 import { applyAction, initialProfile, initialSession, initialWorld, moveSession, tileAt } from "../supabase/functions/_shared/mosslight";
 
 describe("server-authoritative multiplayer rules", () => {
@@ -13,10 +14,30 @@ describe("server-authoritative multiplayer rules", () => {
     const world = initialWorld(seed), profile = initialProfile(), session = initialSession();
     const first = applyAction({ world, profile, session, seed, kind: "hit", x: 21, y: 23, now: 1000, canBuild: true });
     expect(first.changed).toBe(false);
+    expect(first.event).toEqual({ kind:'damage', x:21, y:23, hits:1 });
     const second = applyAction({ world: first.world, profile: first.profile, session: first.session, seed, kind: "hit", x: 21, y: 23, now: 1250, canBuild: true });
     expect(second.changed).toBe(true);
     expect(tileAt(second.world, 21, 23, seed)).toBe(0);
     expect(second.profile.stats.broken).toBe(1);
+  });
+
+  it('resets mining damage after the crack timeout', () => {
+    const world=initialWorld(seed),profile=initialProfile(),session=initialSession();
+    const first=applyAction({world,profile,session,seed,kind:'hit',x:21,y:23,now:1000,canBuild:true});
+    const later=applyAction({world,profile,session:first.session,seed,kind:'hit',x:21,y:23,now:6000,canBuild:true});
+    expect(later.changed).toBe(false); expect(later.session.damageHits).toBe(1);
+  });
+  it('bounds chat text and lifetime without interpreting markup', () => {
+    expect(chatText(' <hello> ')).toBe('<hello>');
+    expect(()=>chatText('x'.repeat(141))).toThrow();
+    expect(()=>chatText('\n\t')).toThrow();
+    expect(chatDuration('hi')).toBe(3000);
+    expect(chatDuration('x'.repeat(100))).toBe(7000);
+    expect(chatDuration('x'.repeat(140))).toBeLessThanOrEqual(10000);
+  });
+  it('validates world names at the server boundary',()=>{
+    expect(worldName(' Fern Hollow ')).toBe('Fern Hollow');
+    for(const value of ['', 'x'.repeat(33), 'hello\nworld',null]) expect(()=>worldName(value)).toThrow();
   });
 
   it("validates a position and block hit together without a prior position write", () => {

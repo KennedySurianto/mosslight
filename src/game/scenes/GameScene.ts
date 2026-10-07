@@ -19,6 +19,8 @@ import { BlockSystem } from "../systems/BlockSystem";
 import { WorldRenderer } from "../art/WorldRenderer";
 import { GameUI } from "../ui/GameUI";
 import type { OnlineClient, OnlineSnapshot } from "../../online/OnlineClient";
+import type { Peer, ChatMessage } from '../../online/OnlineClient';
+import { WorldHud } from '../../online/WorldHud';
 export class GameScene extends Phaser.Scene {
   online?: OnlineClient;
   onLeaveOnline?: () => void;
@@ -28,6 +30,12 @@ export class GameScene extends Phaser.Scene {
   private onlineActionPending = false;
   private queuedOnlineClick?: { place: boolean; x: number; y: number };
   private peers = new Map<string, Phaser.GameObjects.Sprite>();
+  private peerNames = new Map<string, string>();
+  private labels = new Map<string, Phaser.GameObjects.Text>();
+  private bubbles = new Map<string, { text: Phaser.GameObjects.Text; expiresAt: number }>();
+  private damageExpiry = new Map<string, number>();
+  private socialHud?: WorldHud;
+  private typing = false;
   private listeners?: AbortController;
   world!: WorldSystem;
   inventory!: InventorySystem;
@@ -62,6 +70,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.listeners = new AbortController();
     this.peers.clear();
+    this.peerNames.clear(); this.labels.clear(); this.bubbles.clear(); this.damageExpiry.clear(); this.typing = false;
     this.onlineWorldRevision = -1;
     this.onlinePositionAt = 0;
     this.onlinePositionPending = false;
@@ -70,6 +79,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.listeners?.abort();
       this.ui?.destroy();
+      this.socialHud?.destroy();
       this.scale.off("resize", this.resize, this);
     });
     const saved = this.online?.snapshot ? this.onlineSave(this.online.snapshot) : this.save.load();
@@ -182,6 +192,12 @@ export class GameScene extends Phaser.Scene {
       this.changed();
     };
     this.keys = this.input.keyboard!.addKeys("A,D,W,SPACE") as typeof this.keys;
+    if (this.online) {
+      this.socialHud = new WorldHud(this.ui.root, this.online, open => {
+        this.typing = open; this.setOnlineOverlay(open || !!document.querySelector('#online-app:not([hidden])'));
+      }, message => this.ui.toast(message));
+      this.setPeers(this.online.peers);
+    }
     if (document.querySelector("#online-app:not([hidden])")) this.setOnlineOverlay(true);
     this.follow = this.add.zone(this.player.x, this.player.y - 85, 1, 1);
     const camera = this.cameras.main;
@@ -250,7 +266,7 @@ export class GameScene extends Phaser.Scene {
     return { x: Math.floor(p.x / 32), y: Math.floor(p.y / 32) };
   }
   private interact(place: boolean, now: number, fromHold = false, target?: { x: number; y: number }) {
-    if (this.paused || document.querySelector("#online-app:not([hidden])") || now < this.nextHit) return;
+    if (this.paused || this.typing || document.querySelector("#online-app:not([hidden])") || now < this.nextHit) return;
     const { x, y } = target ?? this.cursor();
     if (!this.blocks.reachable(x, y)) {
       this.hint("A little closer — reach is about 4 tiles.");
@@ -435,7 +451,7 @@ export class GameScene extends Phaser.Scene {
   update(now: number, delta: number) {
     if (!this.player) return;
     const dt = Math.min(delta / 1000, 0.04);
-    if (!this.paused && !document.hidden && !document.querySelector("#online-app:not([hidden])")) {
+    if (!this.paused && !this.typing && !document.hidden && !document.querySelector("#online-app:not([hidden])")) {
       const direction =
         (this.keys.D.isDown ? 1 : 0) - (this.keys.A.isDown ? 1 : 0);
       const jump =
@@ -467,7 +483,12 @@ export class GameScene extends Phaser.Scene {
         this.interact(false, now, true);
     }
     this.follow.setPosition(this.player.x, this.player.y - 85);
+    if (this.online && now-this.onlinePositionAt>10000 && !this.onlinePositionPending && !this.onlineActionPending) {
+      this.onlinePositionAt=now; this.onlinePositionPending=true;
+      void this.online.position(this.player.x,this.player.y,this.player.facing).catch(()=>{}).finally(()=>{this.onlinePositionPending=false;});
+    }
     this.worldRenderer.update(now);
+    this.updateLabels();
     this.drawTarget();
     // Evaluate every frame so the popup disappears on the first frame of exit.
     const sign = touchingSign(this.player);
@@ -508,6 +529,9 @@ export class GameScene extends Phaser.Scene {
       c = this.worldRenderer.cracks;
     g.clear();
     c.clear();
+    for (const [key, expiry] of this.damageExpiry) if (Date.now() > expiry || !this.world.get(...key.split(',').map(Number) as [number,number])) {
+      this.blocks.damage.delete(key); this.damageExpiry.delete(key);
+    }
     for (const [key, hits] of this.blocks.damage) {
       const [x, y] = key.split(",").map(Number);
       c.lineStyle(1, 0x423c36, 0.8);
@@ -607,12 +631,23 @@ export class GameScene extends Phaser.Scene {
     this.guide = data.profile.state.guide as unknown as GuideProgress;
     this.tutorial = data.profile.state.tutorial;
     this.applyUpgrades();
+    const damage = data.session?.state;
+    if (damage?.damageKey && damage.damageHits) {
+      this.blocks.damage.set(damage.damageKey, damage.damageHits);
+      this.damageExpiry.set(damage.damageKey, Date.now()+4000);
+    }
+    this.socialHud?.updateName(data.world.name);
     this.ui.render();
     this.ui.status(this.gems, Math.floor(this.player.x / 32), Math.floor(this.player.y / 32), "", this.stats, this.guide, true);
   }
   applyOnlineWorldEvent(event: Record<string, unknown>) {
+    if (event.kind === 'rename' && typeof event.name === 'string') { this.socialHud?.updateName(event.name); return; }
     if (!this.world || event.actor === this.online?.snapshot?.profile.user_id) return;
     const x = Number(event.x), y = Number(event.y);
+    if (event.kind === 'damage' && Number.isInteger(x) && Number.isInteger(y)) {
+      const key = `${x},${y}`;
+      this.blocks.damage.set(key, Number(event.hits)); this.damageExpiry.set(key, Date.now()+4000); return;
+    }
     if (event.kind === "tile" && Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(event.id)) {
       this.world.set(x, y, Number(event.id));
     } else if (event.kind === "foliage" && Number.isInteger(x) && Number.isInteger(y)) {
@@ -626,17 +661,53 @@ export class GameScene extends Phaser.Scene {
     }
   }
   updatePeer(userId: string, x: number, y: number, facing: number) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (!this.peerNames.has(userId) || !Number.isFinite(x) || !Number.isFinite(y)) return;
     let sprite = this.peers.get(userId);
     if (!sprite) {
       sprite = this.add.sprite(x, y, "player-idle").setOrigin(.5, 1).setScale(.72).setTint(0xb5d7e2).setDepth(9);
       this.peers.set(userId, sprite);
     }
     sprite.setFlipX(facing < 0);
+    this.tweens.killTweensOf(sprite);
     this.tweens.add({ targets: sprite, x, y, duration: 450 });
   }
-  setPeers(ids: string[]) {
-    for (const [id, sprite] of this.peers) if (!ids.includes(id)) { sprite.destroy(); this.peers.delete(id); }
+  setPeers(players: Peer[]) {
+    if (!this.player) return;
+    this.peerNames = new Map(players.map(p => [p.userId,p.username]));
+    for (const [id, sprite] of this.peers) if (!this.peerNames.has(id)) {
+      this.tweens.killTweensOf(sprite); sprite.destroy(); this.peers.delete(id);
+      this.labels.get(id)?.destroy(); this.labels.delete(id);
+      this.bubbles.get(id)?.text.destroy(); this.bubbles.delete(id);
+    }
+    for (const p of players) if (!this.peers.has(p.userId)) this.updatePeer(p.userId,p.x,p.y,p.facing);
+  }
+  showChat(message: ChatMessage) {
+    if (!this.sys.isActive() || !this.player || message.expiresAt <= Date.now()) return;
+    if (message.userId !== this.online?.snapshot?.profile.user_id && !this.peerNames.has(message.userId)) return;
+    this.bubbles.get(message.userId)?.text.destroy();
+    const text = this.add.text(0,0,message.text,{ fontFamily:'sans-serif', fontSize:'9px', color:'#283a2e', backgroundColor:'#f4f0dd', padding:{x:5,y:4}, wordWrap:{width:125,useAdvancedWrap:true}, align:'center' }).setOrigin(.5,1).setDepth(50);
+    this.bubbles.set(message.userId,{ text, expiresAt:Math.min(message.expiresAt,Date.now()+10000) });
+  }
+  private updateLabels() {
+    if (!this.online) return;
+    const me = this.online.snapshot!.profile;
+    const positions = [{ userId:me.user_id, username:me.username, x:this.player.x, y:this.player.y },
+      ...Array.from(this.peers,([userId,sprite]) => ({ userId,username:this.peerNames.get(userId)!,x:sprite.x,y:sprite.y }))];
+    const occupied: {x:number;y:number}[]=[];
+    for (const p of positions.sort((a,b)=>a.userId.localeCompare(b.userId))) {
+      let label = this.labels.get(p.userId);
+      if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'sans-serif',fontSize:'9px',color:'#fff9e8',backgroundColor:'#304b3b',padding:{x:3,y:1}}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
+      let labelY=p.y-34;
+      while(occupied.some(q=>Math.abs(q.x-p.x)<110 && Math.abs(q.y-labelY)<14)) labelY-=14;
+      label.setPosition(p.x,labelY); occupied.push({x:p.x,y:labelY});
+    }
+    for (const p of positions) {
+      const bubble = this.bubbles.get(p.userId);
+      if (bubble) {
+        if (Date.now() >= bubble.expiresAt) { bubble.text.destroy(); this.bubbles.delete(p.userId); }
+        else bubble.text.setPosition(p.x,Math.min(...occupied.filter(q=>Math.abs(q.x-p.x)<110).map(q=>q.y))-16);
+      }
+    }
   }
   snapshot(): SaveData {
     return {

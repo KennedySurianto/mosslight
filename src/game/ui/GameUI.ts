@@ -161,6 +161,7 @@ export class GameUI {
     window.addEventListener("pointerup", (e) => this.endDrag(e), { signal: this.listeners.signal });
     window.addEventListener("pointercancel", () => this.cancelDrag(), { signal: this.listeners.signal });
     window.addEventListener("keydown", (e) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (document.querySelector("#online-app:not([hidden])")) return;
       if (this.shopPanel.open) {
         if (e.code === "Escape") {
@@ -332,10 +333,12 @@ export class GameUI {
     this.root.querySelector("#gem-count")!.textContent = gems.toLocaleString();
     this.root.querySelector("#coordinates")!.textContent =
       `${y > 31 ? "THE QUIET BELOW" : "MEADOW"} · ${x}, ${y}`;
-    this.root.querySelector(".location b")!.textContent =
-      y > 31 ? "The Quiet Below" : "The First Meadow";
-    this.root.querySelector(".location small")!.textContent =
-      y > 31 ? "There is more beneath the surface" : "A place to begin";
+    if (!online) {
+      this.root.querySelector(".location b")!.textContent =
+        y > 31 ? "The Quiet Below" : "The First Meadow";
+      this.root.querySelector(".location small")!.textContent =
+        y > 31 ? "There is more beneath the surface" : "A place to begin";
+    }
     this.root.querySelector("#save-status")!.innerHTML = error
       ? "Export to keep your progress"
       : online ? "<i></i> Synced online" : "<i></i> Saved in this browser";

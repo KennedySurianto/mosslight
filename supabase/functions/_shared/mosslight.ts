@@ -193,7 +193,7 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
     changed = true; event = { kind: "harvest", x: tree.x, y: tree.y }; message = "Tree harvested";
   } else if (current > 0 && current < 7) {
     const key = `${x},${y}`;
-    session.damageHits = session.damageKey === key ? session.damageHits + (profile.upgrades.includes("pickaxe") ? 2 : 1) : (profile.upgrades.includes("pickaxe") ? 2 : 1);
+    session.damageHits = session.damageKey === key && now-input.session.lastAction <= 4000 ? session.damageHits + (profile.upgrades.includes("pickaxe") ? 2 : 1) : (profile.upgrades.includes("pickaxe") ? 2 : 1);
     session.damageKey = key;
     if (session.damageHits >= DURABILITY[current]) {
       session.damageKey = ""; session.damageHits = 0;
@@ -203,7 +203,7 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
       if (Math.random() < (current === 6 ? .9 : current === 5 ? .25 : .2)) profile.gems += current === 6 ? 3 + Math.floor(Math.random() * 6) : 1 + Math.floor(Math.random() * 3);
       profile.stats.broken++; profile.guide.mined = true; profile.guide.collected = true;
       changed = true; event = { kind: "tile", x, y, id: 0 }; message = "Block broken";
-    } else message = "Keep digging";
+    } else { message = "Keep digging"; event = { kind: "damage", x, y, hits: session.damageHits }; }
   } else throw new Error("Nothing to break here");
   if (Object.keys(world.modifications).length > 3500 || world.clearedFoliage.length > 128 || JSON.stringify(world).length > 131072)
     throw new Error("World edit limit reached");
