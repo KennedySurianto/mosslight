@@ -688,7 +688,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.sys.isActive() || !this.player || message.expiresAt <= Date.now()) return;
     if (message.userId !== this.online?.snapshot?.profile.user_id && !this.peerNames.has(message.userId)) return;
     this.bubbles.get(message.userId)?.text.destroy();
-    const text = this.add.text(0,0,message.text,{ fontFamily:'sans-serif', fontSize:'9px', color:'#283a2e', backgroundColor:'#f4f0dd', padding:{x:5,y:4}, wordWrap:{width:125,useAdvancedWrap:true}, align:'center' }).setOrigin(.5,1).setDepth(50);
+    const text = this.add.text(0,0,message.text,{ fontFamily:'monospace', fontSize:'11px', fontStyle:'bold', color:'#233c2d', backgroundColor:'#fff9e6', padding:{x:7,y:5}, wordWrap:{width:150,useAdvancedWrap:true}, align:'center', stroke:'#dce9c9', strokeThickness:1 }).setOrigin(.5,1).setDepth(50);
     this.bubbles.set(message.userId,{ text, startedAt:Date.now(), expiresAt:Math.min(message.expiresAt,Date.now()+10000) });
   }
   private updateLabels() {
@@ -704,7 +704,7 @@ export class GameScene extends Phaser.Scene {
     const occupied: {x:number;y:number}[]=[];
     for (const p of positions.sort((a,b)=>a.userId.localeCompare(b.userId))) {
       let label = this.labels.get(p.userId);
-      if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'sans-serif',fontSize:'9px',color:'#ffffff',stroke:'#254033',strokeThickness:2}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
+      if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'monospace',fontSize:'11px',fontStyle:'bold',color:'#ffffff',stroke:'#1a3326',strokeThickness:3}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
       let labelY=p.y-34;
       while(occupied.some(q=>Math.abs(q.x-p.x)<110 && Math.abs(q.y-labelY)<14)) labelY-=14;
       label.setPosition(p.x,labelY); occupied.push({x:p.x,y:labelY});

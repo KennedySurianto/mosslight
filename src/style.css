@@ -859,12 +859,14 @@ button:active {
 }
 .gems {
   transition:
-    background 0.15s,
-    box-shadow 0.15s;
+    transform .18s,
+    background .18s,
+    box-shadow .18s;
 }
 .gems:hover {
-  background: #fff9da;
-  box-shadow: 0 0 0 2px #779b5c55;
+  transform: translateY(-2px);
+  background: #fff9e9;
+  box-shadow: 0 4px 0 #b3bd958c, 0 10px 22px #243b2b32;
 }
 .shop-overlay {
   z-index: 55;
@@ -1337,8 +1339,8 @@ button:active {
 .hud-social { min-height: 43px; display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 7px; border: 1px solid #fff9dfb8; border-radius: 9px; color: #2d4b37; background: linear-gradient(150deg,#fffbeaed,#e4ebd2d9); box-shadow: 0 2px 0 #b3bd958c, 0 8px 20px #243b2b24; backdrop-filter: blur(14px); cursor: pointer; transition: transform .18s, background .18s, box-shadow .18s; }
 .hud-social:hover { transform: translateY(-2px); background: #fff9e9; box-shadow: 0 4px 0 #b3bd958c, 0 10px 22px #243b2b32; }
 .hud-social:focus-visible { outline: 2px solid #5d885e; outline-offset: 3px; }
-.hud-social-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: none; border-radius: 7px; color: #f6f1d8; background: linear-gradient(145deg,#769963,#3f684d); box-shadow: inset 0 1px #ffffff55, 0 2px 3px #26412c55; font: 22px Georgia,serif; line-height: 1; }
-#open-chat .hud-social-icon { font-size: 19px; }
+.hud-social-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: none; border-radius: 7px; background: linear-gradient(145deg,#769963,#3f684d); box-shadow: inset 0 1px #ffffff55, 0 2px 3px #26412c55; }
+.hud-social-icon img { width: 23px; height: 23px; object-fit: contain; image-rendering: pixelated; }
 .hud-social-copy { display: grid; gap: 1px; text-align: left; line-height: 1; }
 .hud-social-copy b { font-size: 10px; letter-spacing: .09em; }
 .hud-social-copy small { font-size: 7px; letter-spacing: .06em; opacity: .7; }
@@ -1389,19 +1391,33 @@ button#world-name:hover { text-decoration: underline dotted; text-underline-offs
 #world-chat button.chat-close { width: 28px; height: 28px; padding: 0; color: #345541; background: #dce7d2; border-color: #bdcdaa; font-size: 19px; }
 #world-chat small { display: block; margin-top: 11px; color: #667c63; }
 #world-chat p { margin: 6px 0 0; color: #854738; }
-.player-card { border: 1px solid #b4c6a4; border-radius: 12px; margin: 10px 0; overflow: hidden; background: linear-gradient(145deg,#fffdf1b8,#eef3e2c9); box-shadow: 0 4px 14px #48634414, inset 0 1px #fff; }
-.player-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #a7b69c55; }
+.player-card { border: 1px solid #b4c6a4; border-radius: 11px; margin: 7px 0; overflow: hidden; background: linear-gradient(145deg,#fffdf1b8,#eef3e2c9); box-shadow: 0 3px 10px #48634412, inset 0 1px #fff; }
+.player-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border-bottom: 1px solid #a7b69c55; }
 .player-card-head > span:first-child { flex: 1; }
 .player-card-head b { display: block; font-size: 14px; }
-.player-card-head small { display: block; margin-top: 3px; font-size: 11px; opacity: .8; }
+.player-card-head small { display: block; margin-top: 2px; font-size: 10px; opacity: .8; }
 .world-card-mark { color: #5b7d5b; font: 25px Georgia,serif; }
-.player-world { padding: 0 16px 14px; }
-.own-world .online-row { padding: 13px 16px; border: 0; }
+.player-world { padding: 0 12px 9px; }
+.player-world .online-row { padding: 7px 0; }
+.player-world .online-row button, .own-world .online-row button { padding: 7px 10px; }
+.own-world .online-row { padding: 7px 12px; border: 0; }
 .player-location { max-width: 48%; text-align: right; overflow-wrap: anywhere; }
 .player-search-label { display: block; font-weight: 600; }
 .player-search-label input { display: block; width: 100%; margin: 8px 0; }
 .directory-more { display: block; margin: 14px auto; }
 .directory-more[hidden] { display: none; }
 .directory-error { color: #854738; }
-.player-world .online-row-actions { flex-wrap: wrap; padding-top: 10px; }
+.player-world .online-row-actions { flex-wrap: wrap; align-items: center; padding-top: 6px; }
+.player-world .online-row-actions button { padding: 6px 9px; }
+.player-world .online-row-actions .remove-friend { width: 29px; height: 29px; display: grid; place-items: center; padding: 0; color: #a63934; background: #f8e0d7; border: 1px solid #d89889; box-shadow: none; }
+.player-world .online-row-actions .remove-friend:hover { color: #fff; background: #b64b3e; }
+.remove-friend svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: square; stroke-linejoin: miter; }
+.build-toggle { display: inline-flex !important; align-items: center; gap: 8px !important; margin-right: auto; color: #3c5f46; cursor: pointer; }
+.build-toggle input { position: absolute; width: 1px; height: 1px; padding: 0; opacity: 0; }
+.build-switch { width: 34px; height: 19px; position: relative; flex: none; border: 1px solid #7f9a77; border-radius: 12px; background: #bdcbb0; transition: background .18s; }
+.build-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fffef0; box-shadow: 0 1px 2px #28463266; transition: transform .18s; }
+.build-toggle input:checked + .build-switch { background: #56835b; }
+.build-toggle input:checked + .build-switch::after { transform: translateX(15px); }
+.build-toggle input:focus-visible + .build-switch { outline: 2px solid #406b4a; outline-offset: 2px; }
+.build-toggle input:disabled + .build-switch { opacity: .55; }
 @media (max-width: 760px) { .hud .location { display: block; max-width: 30vw; } .hud .location-icon, .hud .location small { display: none; } #world-name { max-width: 28vw; font-size: 12px; } .hud-actions { gap: 4px; } #world-chat { top: 88px; right: 16px; } }

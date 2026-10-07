@@ -1,5 +1,6 @@
 import type { OnlineClient } from './OnlineClient';
 import { CHAT_MAX, worldName } from '../../supabase/functions/_shared/social';
+import { iconURLs } from '../game/art/Textures';
 
 export class WorldHud {
   private abort = new AbortController();
@@ -22,7 +23,7 @@ export class WorldHud {
     const button = document.createElement('button');
     button.id = 'open-chat'; button.className = 'hud-social'; button.setAttribute('aria-label','Open world chat');
     button.title = 'Chat with players in this world';
-    button.innerHTML = '<span class="hud-social-icon" aria-hidden="true">☷</span><span class="hud-social-copy"><b>CHAT</b><small>SAY HELLO ↗</small></span>';
+    button.innerHTML = `<span class="hud-social-icon" aria-hidden="true"><img src="${iconURLs['chat-icon']}" alt=""></span><span class="hud-social-copy"><b>CHAT</b><small>SAY HELLO ↗</small></span>`;
     root.querySelector('.hud-actions')!.prepend(button);
     this.form = document.createElement('form');
     this.form.id = 'world-chat'; this.form.hidden = true;

@@ -60,7 +60,7 @@ export class GameUI {
       button.className = "hud-social";
       button.setAttribute("aria-label", "Worlds ↗");
       button.title = "Explore worlds";
-      button.innerHTML = '<span class="hud-social-icon" aria-hidden="true">⌂</span><span class="hud-social-copy"><b>WORLDS</b><small>EXPLORE ↗</small></span>';
+      button.innerHTML = `<span class="hud-social-icon" aria-hidden="true"><img src="${iconURLs['worlds-icon']}" alt=""></span><span class="hud-social-copy"><b>WORLDS</b><small>EXPLORE ↗</small></span>`;
       button.addEventListener("click", actions.leaveWorld);
       this.root.querySelector(".hud-actions")!.prepend(button);
       this.root.querySelector(".world-label")!.innerHTML = "<i></i> SHARED WORLD";

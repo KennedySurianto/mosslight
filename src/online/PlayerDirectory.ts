@@ -31,6 +31,10 @@ export class PlayerDirectory {
       if (button.dataset.world) this.visit(button.dataset.world);
       else if (button.dataset.action && button.dataset.username) void this.social(button);
     });
+    this.list.addEventListener('change', e => {
+      const toggle = (e.target as HTMLElement).closest<HTMLInputElement>('input[data-build-toggle]');
+      if (toggle) void this.setBuildAccess(toggle);
+    });
     this.timer = setInterval(() => void this.refreshLocations(),15000);
     void this.load(true); void this.refreshLocations();
   }
@@ -60,7 +64,12 @@ export class PlayerDirectory {
     const status = player.status==='accepted' ? 'Friend' : player.status==='pending' ? player.incoming ? 'Incoming request' : 'Request sent' : 'New player';
     const own = this.client.snapshot!.worlds.find(w=>w.ownerId===this.client.snapshot!.profile.user_id);
     const world = player.world ? `<div class="online-row"><b>${escape(player.world.name)}</b><button data-world="${player.world.id}">Visit ↗</button></div>` : '<p>Become friends to visit their world.</p>';
-    const action = player.status==='none' ? '<button data-action="request">Add friend</button>' : `${player.incoming && player.status==='pending' ? '<button data-action="accept">Accept request</button>' : ''}<button data-action="remove">${player.status==='pending'?'Cancel request':'Remove friend'}</button>${player.status==='accepted' && own ? '<button data-action="builder">Allow building in my world</button><button data-action="viewer">View only in my world</button>' : ''}`;
+    const remove = player.status==='accepted'
+      ? `<button class="remove-friend" data-action="remove" aria-label="Remove ${escape(player.username)} from friends" title="Remove friend"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M6 2h4M5 5v8h6V5M7 7v4m2-4v4"/></svg></button>`
+      : '<button data-action="remove">Cancel request</button>';
+    const buildToggle = player.status==='accepted' && own
+      ? `<label class="build-toggle"><span>Allow building</span><input type="checkbox" data-build-toggle data-username="${escape(player.username)}" aria-label="Allow ${escape(player.username)} to build in my world" ${player.canBuild?'checked':''}><span class="build-switch" aria-hidden="true"></span></label>` : '';
+    const action = player.status==='none' ? '<button data-action="request">Add friend</button>' : `${player.incoming && player.status==='pending' ? '<button data-action="accept">Accept request</button>' : ''}${buildToggle}${remove}`;
     details.innerHTML = `<div class="player-card-head"><span><b>${escape(player.username)}</b><small>${status}</small></span><small class="player-location"></small></div><div class="player-world">${world}<div class="online-row-actions">${action}</div></div>`;
     details.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b=>{ b.dataset.username=player.username; });
     this.list.append(details);
@@ -73,6 +82,17 @@ export class PlayerDirectory {
       await this.load(true); await this.refreshLocations();
     } catch(error) { this.error.textContent=error instanceof Error?error.message:'Action failed'; }
     finally { button.disabled=false; }
+  }
+  private async setBuildAccess(toggle: HTMLInputElement) {
+    toggle.disabled = true;
+    try {
+      const own=this.client.snapshot!.worlds.find(w=>w.ownerId===this.client.snapshot!.profile.user_id);
+      await this.client.social(toggle.checked?'builder':'viewer',toggle.dataset.username!,own?.id);
+      await this.load(true);
+    } catch(error) {
+      toggle.checked = !toggle.checked;
+      this.error.textContent=error instanceof Error?error.message:'Permission change failed';
+    } finally { toggle.disabled=false; }
   }
   private async refreshLocations() {
     if (this.destroyed || document.hidden) return;
