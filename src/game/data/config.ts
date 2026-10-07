@@ -27,6 +27,7 @@ export type ItemId =
   | "stone"
   | "slate"
   | "amber"
+  | "wheel"
   | "seed"
   | "stoneSeed";
 export interface ItemDef {
@@ -73,6 +74,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     color: "#e9b44f",
     description: "A little sunshine, buried in the earth.",
     tile: 6,
+  },
+  wheel: {
+    name: "Casino wheel",
+    color: "#c39457",
+    description: "Click to spin 0–36. Hold left click to break it.",
+    tile: 8,
   },
   seed: {
     name: "Cedar seed",
@@ -132,6 +139,7 @@ export const BLOCKS: Record<number, BlockDef> = {
   5: block("Deep slate", 5, "slate", 0x71808d, "stoneSeed", 0.13, 0.25),
   6: block("Sunstone", 5, "amber", 0xe9b44f, "stoneSeed", 0.12, 0.9, [3, 8]),
   7: block("Bedrock", Infinity, undefined, 0x424d59),
+  8: block("Casino wheel", 3, "wheel", 0xc39457, "seed", 0, 0),
 };
 export const SIGNS = [
   {

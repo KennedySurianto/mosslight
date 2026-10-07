@@ -20,6 +20,22 @@ describe("server-authoritative multiplayer rules", () => {
     expect(tileAt(second.world, 21, 23, seed)).toBe(0);
     expect(second.profile.stats.broken).toBe(1);
   });
+  it("spins a placed wheel without storing a result or awarding gems", () => {
+    const world = initialWorld(seed), profile = initialProfile(), session = initialSession();
+    profile.inventory[0] = { id: "wheel", count: 1 };
+    const placed = applyAction({ world, profile, session, seed, kind: "place", x: 21, y: 22, now: 1000, canBuild: true });
+    const spun = applyAction({ world: placed.world, profile: placed.profile, session: placed.session,
+      seed, kind: "spin", x: 21, y: 22, now: 1250, canBuild: false });
+    expect(spun.changed).toBe(false);
+    expect(spun.profile.gems).toBe(profile.gems);
+    expect(spun.world).toEqual(placed.world);
+    expect(spun.event).toMatchObject({ kind: "wheel", x: 21, y: 22 });
+    const result = spun.event as { number: number; color: string };
+    expect(result.number).toBeGreaterThanOrEqual(0);
+    expect(result.number).toBeLessThanOrEqual(36);
+    expect(result.number === 0 ? result.color === "green" : ["red", "black"].includes(result.color)).toBe(true);
+    expect(() => applyAction({ world, profile, session, seed, kind: "spin", x: 21, y: 22, now: 1000, canBuild: true })).toThrow("casino wheel");
+  });
 
   it('resets mining damage after the crack timeout', () => {
     const world=initialWorld(seed),profile=initialProfile(),session=initialSession();

@@ -21,6 +21,7 @@ import { GameUI } from "../ui/GameUI";
 import type { OnlineClient, OnlineSnapshot } from "../../online/OnlineClient";
 import type { Peer, ChatMessage } from '../../online/OnlineClient';
 import { WorldHud } from '../../online/WorldHud';
+import { spinWheel, type WheelResult } from '../../../supabase/functions/_shared/mosslight';
 export class GameScene extends Phaser.Scene {
   online?: OnlineClient;
   onLeaveOnline?: () => void;
@@ -35,6 +36,8 @@ export class GameScene extends Phaser.Scene {
   private bubbles = new Map<string, { text: Phaser.GameObjects.Text; startedAt: number; expiresAt: number }>();
   private peerWalkingUntil = new Map<string, number>();
   private damageExpiry = new Map<string, number>();
+  private wheelResults = new Map<string, Phaser.GameObjects.Text>();
+  private wheelPress?: { x: number; y: number; startedAt: number; mining: boolean };
   private socialHud?: WorldHud;
   private typing = false;
   private listeners?: AbortController;
@@ -71,7 +74,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.listeners = new AbortController();
     this.peers.clear();
-    this.peerNames.clear(); this.labels.clear(); this.bubbles.clear(); this.peerWalkingUntil.clear(); this.damageExpiry.clear(); this.typing = false;
+    this.peerNames.clear(); this.labels.clear(); this.bubbles.clear(); this.peerWalkingUntil.clear(); this.damageExpiry.clear(); this.wheelResults.clear(); this.wheelPress = undefined; this.typing = false;
     this.onlineWorldRevision = -1;
     this.onlinePositionAt = 0;
     this.onlinePositionPending = false;
@@ -215,6 +218,11 @@ export class GameScene extends Phaser.Scene {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
       if (e.button === 0) {
+        const target = this.cursor();
+        if (this.world.get(target.x, target.y) === 8) {
+          this.wheelPress = { ...target, startedAt: this.time.now, mining: false };
+          return;
+        }
         this.held = true;
         this.interact(false, this.time.now);
       } else if (e.button === 2) this.interact(true, this.time.now);
@@ -223,9 +231,19 @@ export class GameScene extends Phaser.Scene {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
     }, { signal: this.listeners.signal });
-    window.addEventListener("pointerup", () => (this.held = false), { signal: this.listeners.signal });
+    window.addEventListener("pointerup", (e) => {
+      if (e.button === 0 && this.wheelPress) {
+        const press = this.wheelPress;
+        this.wheelPress = undefined;
+        if (!press.mining && this.world.get(press.x, press.y) === 8 &&
+          this.cursor().x === press.x && this.cursor().y === press.y)
+          this.spinWheelAt(press.x, press.y, this.time.now);
+      }
+      this.held = false;
+    }, { signal: this.listeners.signal });
     window.addEventListener("blur", () => {
       this.held = false;
+      this.wheelPress = undefined;
       this.keys.A.reset();
       this.keys.D.reset();
       this.keys.W.reset();
@@ -235,6 +253,7 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         this.held = false;
+        this.wheelPress = undefined;
         this.persist();
       }
     }, { signal: this.listeners.signal });
@@ -247,6 +266,7 @@ export class GameScene extends Phaser.Scene {
   }
   setOnlineOverlay(open: boolean) {
     this.held = false;
+    this.wheelPress = undefined;
     this.queuedOnlineClick = undefined;
     this.keys?.A.reset();
     this.keys?.D.reset();
@@ -391,6 +411,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.audio.play(broken ? "break" : "hit");
     if (broken) {
+      this.clearWheelResult(x, y);
       this.markGuide("mined");
       this.stats.broken++;
       if (def.item) this.drops.spawn(x * 32 + 16, y * 32 + 12, def.item);
@@ -477,6 +498,14 @@ export class GameScene extends Phaser.Scene {
         !Number.isFinite(this.player.x)
       )
         this.player.respawn();
+      if (this.wheelPress && !this.wheelPress.mining && now - this.wheelPress.startedAt >= 350) {
+        const press = this.wheelPress, cursor = this.cursor();
+        if (cursor.x === press.x && cursor.y === press.y && this.world.get(press.x, press.y) === 8) {
+          press.mining = true;
+          this.held = true;
+          this.interact(false, now, false, press);
+        } else this.wheelPress = undefined;
+      }
       if (
         this.held &&
         document.elementFromPoint(this.mouseX, this.mouseY) === this.game.canvas
@@ -584,7 +613,9 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(valid ? 0xb8dd83 : 0xcf7c70, 0.16);
       g.fillRect(x * 32 + 1, y * 32 + 1, 30, 30);
     }
-    const text = foliage
+    const text = id === 8 && reachable
+      ? "Casino wheel · click to spin · hold to break"
+      : foliage
       ? `${FOLIAGE_NAMES[foliage]} · left click to clear`
       : tree
         ? this.seeds.stage(tree) === 3
@@ -623,6 +654,10 @@ export class GameScene extends Phaser.Scene {
       this.world.revision++;
       this.seeds.trees = data.world.state.trees;
       this.onlineWorldRevision = data.world.revision;
+      for (const key of this.wheelResults.keys()) {
+        const [x, y] = key.split(",").map(Number);
+        if (this.world.get(x, y) !== 8) this.clearWheelResult(x, y);
+      }
     }
     this.inventory.slots = structuredClone(data.profile.state.inventory);
     this.inventory.selected = data.profile.state.selected;
@@ -645,12 +680,17 @@ export class GameScene extends Phaser.Scene {
     if (event.kind === 'rename' && typeof event.name === 'string') { this.socialHud?.updateName(event.name); return; }
     if (!this.world || event.actor === this.online?.snapshot?.profile.user_id) return;
     const x = Number(event.x), y = Number(event.y);
+    if (event.kind === 'wheel' && Number.isInteger(x) && Number.isInteger(y)) {
+      this.showWheelResult(x, y, { number: Number(event.number), color: event.color as WheelResult['color'] });
+      return;
+    }
     if (event.kind === 'damage' && Number.isInteger(x) && Number.isInteger(y)) {
       const key = `${x},${y}`;
       this.blocks.damage.set(key, Number(event.hits)); this.damageExpiry.set(key, Date.now()+4000); return;
     }
     if (event.kind === "tile" && Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(event.id)) {
       this.world.set(x, y, Number(event.id));
+      if (Number(event.id) !== 8) this.clearWheelResult(x, y);
     } else if (event.kind === "foliage" && Number.isInteger(x) && Number.isInteger(y)) {
       this.world.clearFoliage(x, y);
     } else if (event.kind === "plant" && event.tree && typeof event.tree === "object") {
@@ -672,6 +712,45 @@ export class GameScene extends Phaser.Scene {
     sprite.setFlipX(facing < 0);
     this.tweens.killTweensOf(sprite);
     this.tweens.add({ targets: sprite, x, y, duration: 450 });
+  }
+  private spinWheelAt(x: number, y: number, now: number) {
+    if (this.paused || this.typing || document.querySelector("#online-app:not([hidden])") ||
+      now < this.nextHit || this.world.get(x, y) !== 8) return;
+    if (!this.blocks.reachable(x, y)) { this.hint("A little closer to spin the wheel."); return; }
+    if (this.onlineActionPending) return;
+    this.nextHit = now + GAME.hitDelay;
+    this.player.actionUntil = now + 160;
+    this.player.facing = x * 32 + 16 >= this.player.x ? 1 : -1;
+    if (this.online) {
+      this.onlineActionPending = true;
+      void this.online.action("spin", x, y, this.inventory.selected,
+        this.player.x, this.player.y, this.player.facing)
+        .then(({ data, spin }) => {
+          this.applyOnlineSnapshot(data);
+          if (spin) this.showWheelResult(x, y, spin);
+        })
+        .catch(error => this.ui.toast(error instanceof Error ? error.message : "Spin failed"))
+        .finally(() => { this.onlineActionPending = false; });
+    } else this.showWheelResult(x, y, spinWheel());
+  }
+  private showWheelResult(x: number, y: number, result: WheelResult) {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || this.world.get(x, y) !== 8 ||
+      !Number.isInteger(result.number) || result.number < 0 || result.number > 36 ||
+      (result.number === 0 ? result.color !== "green" : !["red", "black"].includes(result.color))) return;
+    const key = `${x},${y}`;
+    this.wheelResults.get(key)?.destroy();
+    const color = result.color === "green" ? "#14854b" : result.color === "red" ? "#b43632" : "#171c24";
+    const text = this.add.text(x * 32 + 16, y * 32 + 16, String(result.number), {
+      fontFamily: "monospace", fontSize: "13px", fontStyle: "bold", color,
+      stroke: "#fff5d2", strokeThickness: 2,
+    }).setOrigin(.5).setDepth(12);
+    this.wheelResults.set(key, text);
+    this.audio.play("ui");
+  }
+  private clearWheelResult(x: number, y: number) {
+    const key = `${x},${y}`;
+    this.wheelResults.get(key)?.destroy();
+    this.wheelResults.delete(key);
   }
   setPeers(players: Peer[]) {
     if (!this.player) return;

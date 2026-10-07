@@ -1339,8 +1339,8 @@ button:active {
 .hud-social { min-height: 43px; display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 7px; border: 1px solid #fff9dfb8; border-radius: 9px; color: #2d4b37; background: linear-gradient(150deg,#fffbeaed,#e4ebd2d9); box-shadow: 0 2px 0 #b3bd958c, 0 8px 20px #243b2b24; backdrop-filter: blur(14px); cursor: pointer; transition: transform .18s, background .18s, box-shadow .18s; }
 .hud-social:hover { transform: translateY(-2px); background: #fff9e9; box-shadow: 0 4px 0 #b3bd958c, 0 10px 22px #243b2b32; }
 .hud-social:focus-visible { outline: 2px solid #5d885e; outline-offset: 3px; }
-.hud-social-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: none; border-radius: 7px; background: linear-gradient(145deg,#769963,#3f684d); box-shadow: inset 0 1px #ffffff55, 0 2px 3px #26412c55; }
-.hud-social-icon img { width: 23px; height: 23px; object-fit: contain; image-rendering: pixelated; }
+.hud-social-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: none; }
+.hud-social-icon img { width: 25px; height: 25px; object-fit: contain; image-rendering: pixelated; }
 .hud-social-copy { display: grid; gap: 1px; text-align: left; line-height: 1; }
 .hud-social-copy b { font-size: 10px; letter-spacing: .09em; }
 .hud-social-copy small { font-size: 7px; letter-spacing: .06em; opacity: .7; }
@@ -1357,7 +1357,8 @@ button:active {
 .online-card button { padding: 10px 14px; border: 1px solid #315841; border-radius: 8px; color: #f6f2db; background: linear-gradient(145deg,#547b55,#345f47); box-shadow: 0 2px 0 #24473355; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .online-card button:hover { background: #4f7a57; }
 .online-card button:disabled { opacity: .55; cursor: wait; }
-.online-card button.online-text { padding: 6px 0; color: #3e684b; background: transparent; }
+.online-card button.online-text { padding: 6px 0; color: #3e684b; background: transparent; border: 0; box-shadow: none; }
+.online-card button.online-text:focus-visible { outline: 0; text-decoration: underline; text-underline-offset: 3px; }
 .online-card small { font-size: 10px; color: #7c8a70; }
 .online-error { min-height: 18px; color: #a33f38 !important; }
 .online-head,.online-row,.online-inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

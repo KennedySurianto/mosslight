@@ -107,7 +107,7 @@ export function validateSave(value: unknown): SaveData {
       rest.length ||
       !integer(x, 1, GAME.width - 2) ||
       !integer(y, 0, GAME.height - 3) ||
-      !integer(id, 0, 6) ||
+      !integer(id, 0, 8) || id === 7 ||
       key !== `${x},${y}`
     )
       throw new Error("Invalid tile data.");

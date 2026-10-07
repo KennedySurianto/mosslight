@@ -5,7 +5,7 @@ export const SURFACE = 23;
 export const SPAWN_X = 19;
 export const TILE = 32;
 export const REACH = 4.6 * TILE;
-export const ITEM_IDS = ["dirt", "grass", "wood", "stone", "slate", "amber", "seed", "stoneSeed"] as const;
+export const ITEM_IDS = ["dirt", "grass", "wood", "stone", "slate", "amber", "wheel", "seed", "stoneSeed"] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 export type Stack = { id: ItemId; count: number };
 export type Tree = { x: number; y: number; type: "seed" | "stoneSeed"; plantedAt: number; growthDuration: number };
@@ -22,9 +22,9 @@ export type ProfileState = {
 };
 export type SessionState = { x: number; y: number; facing: number; damageKey: string; damageHits: number; lastAction: number; lastPositionAt: number };
 const GROWTH = { seed: 45000, stoneSeed: 75000 };
-const BLOCK_ITEM: Record<number, ItemId | null> = { 1: "grass", 2: "dirt", 3: "stone", 4: "wood", 5: "slate", 6: "amber" };
-const DURABILITY: Record<number, number> = { 1: 2, 2: 2, 3: 4, 4: 3, 5: 5, 6: 5 };
-const ITEM_TILE: Partial<Record<ItemId, number>> = { grass: 1, dirt: 2, stone: 3, wood: 4, slate: 5, amber: 6 };
+const BLOCK_ITEM: Record<number, ItemId | null> = { 1: "grass", 2: "dirt", 3: "stone", 4: "wood", 5: "slate", 6: "amber", 8: "wheel" };
+const DURABILITY: Record<number, number> = { 1: 2, 2: 2, 3: 4, 4: 3, 5: 5, 6: 5, 8: 3 };
+const ITEM_TILE: Partial<Record<ItemId, number>> = { grass: 1, dirt: 2, stone: 3, wood: 4, slate: 5, amber: 6, wheel: 8 };
 const OFFERS: Record<string, { price: number; upgrade?: string; contents?: Stack[] }> = {
   pickaxe: { price: 18, upgrade: "pickaxe" }, shoes: { price: 24, upgrade: "shoes" },
   boots: { price: 32, upgrade: "boots" }, magnet: { price: 28, upgrade: "magnet" },
@@ -36,6 +36,7 @@ const OFFERS: Record<string, { price: number; upgrade?: string; contents?: Stack
   "stone-pack": { price: 8, contents: [{ id: "stone", count: 20 }] },
   "slate-pack": { price: 12, contents: [{ id: "slate", count: 15 }] },
   "sunstone-pack": { price: 16, contents: [{ id: "amber", count: 8 }] },
+  "casino-wheel": { price: 5, contents: [{ id: "wheel", count: 1 }] },
   "garden-kit": { price: 8, contents: [{ id: "grass", count: 10 }, { id: "seed", count: 3 }] },
   "cabin-kit": { price: 18, contents: [{ id: "wood", count: 30 }, { id: "stone", count: 15 }] },
   "landscape-kit": { price: 12, contents: [{ id: "dirt", count: 40 }, { id: "grass", count: 30 }] },
@@ -141,9 +142,14 @@ export function applyShop(profileInput: ProfileState, offerId: string) {
   if (offer.upgrade) profile.upgrades.push(offer.upgrade);
   return profile;
 }
-export function applyAction(input: { world: WorldState; profile: ProfileState; session: SessionState; seed: number; kind: "hit" | "place"; x: number; y: number; now: number; canBuild: boolean }) {
+export type WheelResult = { number: number; color: "green" | "red" | "black" };
+export function spinWheel(): WheelResult {
+  const number = Math.floor(Math.random() * 37);
+  return { number, color: number === 0 ? "green" : Math.random() < .5 ? "red" : "black" };
+}
+export function applyAction(input: { world: WorldState; profile: ProfileState; session: SessionState; seed: number; kind: "hit" | "place" | "spin"; x: number; y: number; now: number; canBuild: boolean }) {
   const { seed, kind, x, y, now, canBuild } = input;
-  if (!canBuild) throw new Error("This world is view-only for you");
+  if (!canBuild && kind !== "spin") throw new Error("This world is view-only for you");
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 1 || x >= WIDTH - 1 || y < 1 || y >= HEIGHT - 2) throw new Error("World boundary");
   if (protectedTile(x, y)) throw new Error("Leave room for home");
   if (Math.hypot(x * TILE + 16 - input.session.x, y * TILE + 16 - (input.session.y - 18)) > REACH) throw new Error("A little closer");
@@ -155,7 +161,12 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
   let message = "";
   const current = tileAt(world, x, y, seed);
   const tree = treeAt(world, x, y, now);
-  if (kind === "place") {
+  if (kind === "spin") {
+    if (current !== 8) throw new Error("Click a casino wheel to spin");
+    const result = spinWheel();
+    event = { kind: "wheel", x, y, ...result };
+    message = `${result.number} ${result.color}`;
+  } else if (kind === "place") {
     const slot = profile.inventory[profile.selected];
     if (!slot) throw new Error("Select a block or seed");
     if (current || tree || foliageAt(world, x, y, seed)) throw new Error("This space is occupied");
@@ -191,7 +202,7 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
     profile.gems += 2 + Math.floor(Math.random() * 4);
     profile.stats.harvested++; profile.guide.collected = true;
     changed = true; event = { kind: "harvest", x: tree.x, y: tree.y }; message = "Tree harvested";
-  } else if (current > 0 && current < 7) {
+  } else if (current > 0 && (current < 7 || current === 8)) {
     const key = `${x},${y}`;
     session.damageHits = session.damageKey === key && now-input.session.lastAction <= 4000 ? session.damageHits + (profile.upgrades.includes("pickaxe") ? 2 : 1) : (profile.upgrades.includes("pickaxe") ? 2 : 1);
     session.damageKey = key;
@@ -199,8 +210,8 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
       session.damageKey = ""; session.damageHits = 0;
       setTile(world, x, y, 0, seed);
       const item = BLOCK_ITEM[current]; if (item) addItem(profile, item, 1);
-      if (Math.random() < (current >= 5 ? .13 : .11)) addItem(profile, current >= 3 ? "stoneSeed" : "seed", 1);
-      if (Math.random() < (current === 6 ? .9 : current === 5 ? .25 : .2)) profile.gems += current === 6 ? 3 + Math.floor(Math.random() * 6) : 1 + Math.floor(Math.random() * 3);
+      if (current !== 8 && Math.random() < (current >= 5 ? .13 : .11)) addItem(profile, current >= 3 ? "stoneSeed" : "seed", 1);
+      if (current !== 8 && Math.random() < (current === 6 ? .9 : current === 5 ? .25 : .2)) profile.gems += current === 6 ? 3 + Math.floor(Math.random() * 6) : 1 + Math.floor(Math.random() * 3);
       profile.stats.broken++; profile.guide.mined = true; profile.guide.collected = true;
       changed = true; event = { kind: "tile", x, y, id: 0 }; message = "Block broken";
     } else { message = "Keep digging"; event = { kind: "damage", x, y, hits: session.damageHits }; }

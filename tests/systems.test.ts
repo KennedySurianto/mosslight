@@ -242,8 +242,8 @@ describe("foliage and shop progression", () => {
       ),
     ).toBeUndefined();
   });
-  it("all sixteen offers deliver exact rewards and deduct the right price", () => {
-    expect(SHOP).toHaveLength(16);
+  it("all seventeen offers deliver exact rewards and deduct the right price", () => {
+    expect(SHOP).toHaveLength(17);
     for (const offer of SHOP) {
       const shop = new ShopSystem(),
         inventory = new InventorySystem(Array(32).fill(null));
@@ -256,6 +256,23 @@ describe("foliage and shop progression", () => {
           stack.count,
         );
     }
+  });
+  it("places and breaks a purchased casino wheel as a normal block", () => {
+    const w = new WorldSystem(123), i = new InventorySystem(), s = new SeedSystem();
+    for (const key of [...w.foliage.keys()]) {
+      const [x, y] = key.split(",").map(Number);
+      w.clearFoliage(x, y);
+    }
+    const p = { x: 25 * 32 + 16, y: 23 * 32, overlaps: () => false } as unknown as Player;
+    const b = new BlockSystem(w, p, s, i);
+    expect(new ShopSystem().purchase("casino-wheel", 5, i)).toMatchObject({ ok: true, gems: 0 });
+    i.selected = i.slots.findIndex(s => s?.id === "wheel");
+    expect(b.place(26, 22)).toBe(true);
+    expect(w.get(26, 22)).toBe(8);
+    expect(b.hit(26, 22)?.broken).toBe(false);
+    expect(b.hit(26, 22)?.broken).toBe(false);
+    expect(b.hit(26, 22)?.broken).toBe(true);
+    expect(w.get(26, 22)).toBe(0);
   });
   it("rejects insufficient funds and duplicate equipment without charging", () => {
     const shop = new ShopSystem(),

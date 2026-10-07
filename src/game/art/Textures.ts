@@ -87,6 +87,22 @@ export function createTextures(scene: Phaser.Scene) {
       rect(c, "#ffedb5", x + 1, y + 1, 2, 2);
     }
   });
+  make("tile-8", 32, 32, (c) => {
+    rect(c, "#523c32", 1, 1, 30, 30);
+    rect(c, "#c99957", 3, 2, 26, 28);
+    rect(c, "#f1d28a", 5, 4, 22, 24);
+    rect(c, "#2c3938", 7, 6, 18, 20);
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const x = Math.round(16 + Math.cos(angle) * 7);
+      const y = Math.round(16 + Math.sin(angle) * 7);
+      rect(c, i % 2 ? "#b9493f" : "#151b22", x - 2, y - 2, 4, 4);
+    }
+    rect(c, "#f6e8bb", 11, 11, 10, 10);
+    rect(c, "#d9bb78", 12, 12, 8, 8);
+    rect(c, "#fff5d1", 13, 13, 6, 6);
+    rect(c, "#f1d28a", 15, 3, 2, 4);
+  });
   for (const [key, id] of Object.entries({
     grass: 1,
     dirt: 2,
@@ -94,6 +110,7 @@ export function createTextures(scene: Phaser.Scene) {
     wood: 4,
     slate: 5,
     amber: 6,
+    wheel: 8,
   }))
     iconURLs[key] = iconURLs[`tile-${id}`];
   const seed = (c: CanvasRenderingContext2D, blue = false) => {

@@ -1,5 +1,6 @@
 import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 import type { ProfileState, SessionState, WorldState } from "../../supabase/functions/_shared/mosslight";
+import type { WheelResult } from "../../supabase/functions/_shared/mosslight";
 
 export interface OnlineSnapshot {
   profile: { user_id: string; username: string; state: ProfileState; revision: number };
@@ -176,8 +177,8 @@ export class OnlineClient {
     }
     return result.name;
   }
-  async action(kind: "hit" | "place", x: number, y: number, selected: number, playerX: number, playerY: number, facing: number) {
-    const result = await this.invoke<{ data: OnlineSnapshot; message: string; changed: boolean }>("mosslight-game", { type: "action", worldId: this.snapshot!.world.id, kind, x, y, selected, playerX, playerY, facing });
+  async action(kind: "hit" | "place" | "spin", x: number, y: number, selected: number, playerX: number, playerY: number, facing: number) {
+    const result = await this.invoke<{ data: OnlineSnapshot; message: string; changed: boolean; spin: WheelResult | null }>("mosslight-game", { type: "action", worldId: this.snapshot!.world.id, kind, x, y, selected, playerX, playerY, facing });
     if (this.activeRoom===result.data.world.id) this.snapshot = result.data;
     return result;
   }
