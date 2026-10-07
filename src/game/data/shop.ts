@@ -46,12 +46,12 @@ export const SHOP: ShopOffer[] = [
   {
     id: "magnet",
     name: "Gathering charm",
-    description: "Draw nearby drops from 60% farther away.",
+    description: "Pull fresh drops into your backpack faster.",
     price: 28,
     icon: "magnet",
     category: "Gear",
     upgrade: "magnet",
-    badge: "WIDER PICKUP",
+    badge: "FASTER PICKUP",
   },
   {
     id: "cedar-seeds",

@@ -22,7 +22,7 @@ export class WorldHud {
     subtitle.textContent = own ? 'Your world · click its name to rename' : 'Visiting a friend';
     const button = document.createElement('button');
     button.id = 'open-chat'; button.className = 'hud-social'; button.setAttribute('aria-label','Open world chat');
-    button.title = 'Chat with players in this world';
+    button.title = 'Chat with players in this world · /';
     button.innerHTML = `<span class="hud-social-icon" aria-hidden="true"><img src="${iconURLs['chat-icon']}" alt=""></span><span class="hud-social-copy"><b>CHAT</b><small>SAY HELLO ↗</small></span>`;
     root.querySelector('.hud-actions')!.prepend(button);
     this.form = document.createElement('form');
@@ -31,9 +31,29 @@ export class WorldHud {
     root.append(this.form);
     const input = this.form.querySelector('input')!;
     button.addEventListener('click', () => { this.closeName(); this.form.hidden = !this.form.hidden; this.inputMode(!this.form.hidden); if (!this.form.hidden) input.focus(); });
+    document.addEventListener('keydown', e => {
+      if (e.key !== '/' || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+      if (!this.form.hidden) {
+        if (!input.value.trim()) { e.preventDefault(); this.closeChat(); }
+        return;
+      }
+      const target = e.target;
+      if (target instanceof HTMLElement && (target.matches('input, textarea, [contenteditable="true"]'))) return;
+      if (document.querySelector('#online-app:not([hidden]), #modal-overlay:not(.hidden), #shop-overlay:not(.hidden)')) return;
+      e.preventDefault();
+      this.closeName();
+      this.form.hidden = false;
+      this.inputMode(true);
+      input.focus();
+    }, { signal:this.abort.signal });
     this.form.querySelector('[type=button]')!.addEventListener('click', () => this.closeChat());
     input.addEventListener('input', () => { this.form.querySelector('#chat-count')!.textContent = String(input.value.length); });
-    input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); this.closeChat(); } });
+    input.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Escape' || (e.key === '/' && !input.value.trim())) {
+        e.preventDefault(); this.closeChat();
+      }
+    });
     let sending = false;
     this.form.addEventListener('submit', async e => {
       e.preventDefault(); if (sending || !input.value.trim()) return;
@@ -44,7 +64,11 @@ export class WorldHud {
     });
     root.querySelector('#leave-world')?.addEventListener('click', () => { this.closeChat(); this.closeName(); }, { capture:true, signal:this.abort.signal });
   }
-  private closeChat() { this.form.hidden = true; this.inputMode(false); }
+  private closeChat() {
+    if (this.form.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    this.form.hidden = true;
+    this.inputMode(false);
+  }
   private closeName() {
     const input = this.root.querySelector('#world-name-input');
     if (input) input.replaceWith(this.nameElement);

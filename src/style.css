@@ -153,29 +153,48 @@ button:active {
 }
 .gems {
   height: 43px;
-  padding: 8px 15px 8px 12px;
+  padding: 5px 12px 5px 7px;
   display: flex;
   align-items: center;
-  gap: 11px;
-  background: #f6f2d4cc;
-  border: 1px solid #ffffff5e;
-  border-radius: 7px;
-  box-shadow: 0 3px 0 #718e671b;
-  margin-right: 6px;
+  gap: 8px;
+  color: #2d4b37;
+  background: linear-gradient(150deg,#fffbeaed,#e4ebd2d9);
+  border: 1px solid #fff9dfb8;
+  border-radius: 9px;
+  box-shadow: 0 2px 0 #b3bd958c, 0 8px 20px #243b2b24;
+  backdrop-filter: blur(14px);
 }
 .gems img {
-  height: 26px;
-  width: 21px;
+  height: 29px;
+  width: 29px;
+  object-fit: contain;
   image-rendering: pixelated;
 }
-.gems b {
-  font-size: 18px;
-  min-width: 18px;
+.gems .gem-copy {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  line-height: 1;
 }
-.gems span {
-  font-size: 8px;
-  letter-spacing: 1.5px;
-  opacity: 0.6;
+.gems .gem-top {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.gems #gem-count {
+  font-size: 11px;
+  letter-spacing: .03em;
+}
+.gems .gem-word {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+}
+.gems .gem-bottom {
+  color: #426d4e;
+  font-size: 7px;
+  letter-spacing: .06em;
+  opacity: .7;
 }
 .square {
   background: #f5f3d27a;
@@ -817,7 +836,8 @@ button:active {
   .gems {
     padding: 6px 10px;
   }
-  .gems span,
+  .gems .gem-word,
+  .gems .gem-bottom,
   .bottom-hints,
   .world-status {
     display: none;
@@ -849,14 +869,6 @@ button:active {
   }
 }
 /* The market uses the same parchment, cedar, and moss palette as the meadow. */
-.shop-link {
-  display: block;
-  font-size: 7px;
-  letter-spacing: 1px;
-  font-style: normal;
-  margin-top: 4px;
-  color: #426d4e;
-}
 .gems {
   transition:
     transform .18s,
