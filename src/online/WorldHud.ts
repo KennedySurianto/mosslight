@@ -20,11 +20,13 @@ export class WorldHud {
     const subtitle = root.querySelector('.location small')!;
     subtitle.textContent = own ? 'Your world · click its name to rename' : 'Visiting a friend';
     const button = document.createElement('button');
-    button.id = 'open-chat'; button.textContent = 'Chat'; button.setAttribute('aria-label','Open world chat');
+    button.id = 'open-chat'; button.className = 'hud-social'; button.setAttribute('aria-label','Open world chat');
+    button.title = 'Chat with players in this world';
+    button.innerHTML = '<span class="hud-social-icon" aria-hidden="true">☷</span><span class="hud-social-copy"><b>CHAT</b><small>SAY HELLO ↗</small></span>';
     root.querySelector('.hud-actions')!.prepend(button);
     this.form = document.createElement('form');
     this.form.id = 'world-chat'; this.form.hidden = true;
-    this.form.innerHTML = `<label for="chat-message">Say something to this world</label><div><input id="chat-message" maxlength="${CHAT_MAX}" autocomplete="off" placeholder="Type a message…" required><button type="submit">Send ↗</button><button type="button" aria-label="Close chat">×</button></div><small><span id="chat-count">0</span> / ${CHAT_MAX} · Enter to send · Esc to close</small><p role="alert"></p>`;
+    this.form.innerHTML = `<div class="chat-heading"><div><span class="eyebrow">WORLD CHAT</span><label for="chat-message">Say something to this world</label></div><button type="button" class="chat-close" aria-label="Close chat">×</button></div><div class="chat-compose"><input id="chat-message" maxlength="${CHAT_MAX}" autocomplete="off" placeholder="Type a message…" required><button type="submit">Send ↗</button></div><small><span id="chat-count">0</span> / ${CHAT_MAX} · Enter to send · Esc to close</small><p role="alert"></p>`;
     root.append(this.form);
     const input = this.form.querySelector('input')!;
     button.addEventListener('click', () => { this.closeName(); this.form.hidden = !this.form.hidden; this.inputMode(!this.form.hidden); if (!this.form.hidden) input.focus(); });

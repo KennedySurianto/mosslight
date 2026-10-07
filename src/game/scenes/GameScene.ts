@@ -32,7 +32,8 @@ export class GameScene extends Phaser.Scene {
   private peers = new Map<string, Phaser.GameObjects.Sprite>();
   private peerNames = new Map<string, string>();
   private labels = new Map<string, Phaser.GameObjects.Text>();
-  private bubbles = new Map<string, { text: Phaser.GameObjects.Text; expiresAt: number }>();
+  private bubbles = new Map<string, { text: Phaser.GameObjects.Text; startedAt: number; expiresAt: number }>();
+  private peerWalkingUntil = new Map<string, number>();
   private damageExpiry = new Map<string, number>();
   private socialHud?: WorldHud;
   private typing = false;
@@ -70,7 +71,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.listeners = new AbortController();
     this.peers.clear();
-    this.peerNames.clear(); this.labels.clear(); this.bubbles.clear(); this.damageExpiry.clear(); this.typing = false;
+    this.peerNames.clear(); this.labels.clear(); this.bubbles.clear(); this.peerWalkingUntil.clear(); this.damageExpiry.clear(); this.typing = false;
     this.onlineWorldRevision = -1;
     this.onlinePositionAt = 0;
     this.onlinePositionPending = false;
@@ -667,6 +668,7 @@ export class GameScene extends Phaser.Scene {
       sprite = this.add.sprite(x, y, "player-idle").setOrigin(.5, 1).setScale(.72).setTint(0xb5d7e2).setDepth(9);
       this.peers.set(userId, sprite);
     }
+    this.peerWalkingUntil.set(userId, Math.abs(x - sprite.x) > 3 ? this.time.now + 700 : 0);
     sprite.setFlipX(facing < 0);
     this.tweens.killTweensOf(sprite);
     this.tweens.add({ targets: sprite, x, y, duration: 450 });
@@ -676,6 +678,7 @@ export class GameScene extends Phaser.Scene {
     this.peerNames = new Map(players.map(p => [p.userId,p.username]));
     for (const [id, sprite] of this.peers) if (!this.peerNames.has(id)) {
       this.tweens.killTweensOf(sprite); sprite.destroy(); this.peers.delete(id);
+      this.peerWalkingUntil.delete(id);
       this.labels.get(id)?.destroy(); this.labels.delete(id);
       this.bubbles.get(id)?.text.destroy(); this.bubbles.delete(id);
     }
@@ -686,17 +689,22 @@ export class GameScene extends Phaser.Scene {
     if (message.userId !== this.online?.snapshot?.profile.user_id && !this.peerNames.has(message.userId)) return;
     this.bubbles.get(message.userId)?.text.destroy();
     const text = this.add.text(0,0,message.text,{ fontFamily:'sans-serif', fontSize:'9px', color:'#283a2e', backgroundColor:'#f4f0dd', padding:{x:5,y:4}, wordWrap:{width:125,useAdvancedWrap:true}, align:'center' }).setOrigin(.5,1).setDepth(50);
-    this.bubbles.set(message.userId,{ text, expiresAt:Math.min(message.expiresAt,Date.now()+10000) });
+    this.bubbles.set(message.userId,{ text, startedAt:Date.now(), expiresAt:Math.min(message.expiresAt,Date.now()+10000) });
   }
   private updateLabels() {
     if (!this.online) return;
+    for (const [id, sprite] of this.peers) {
+      const walking = this.time.now < (this.peerWalkingUntil.get(id) ?? 0);
+      const texture = walking ? `player-${Math.floor(this.time.now / 110) % 2 ? 'walk1' : 'walk2'}` : 'player-idle';
+      if (sprite.texture.key !== texture) sprite.setTexture(texture);
+    }
     const me = this.online.snapshot!.profile;
     const positions = [{ userId:me.user_id, username:me.username, x:this.player.x, y:this.player.y },
       ...Array.from(this.peers,([userId,sprite]) => ({ userId,username:this.peerNames.get(userId)!,x:sprite.x,y:sprite.y }))];
     const occupied: {x:number;y:number}[]=[];
     for (const p of positions.sort((a,b)=>a.userId.localeCompare(b.userId))) {
       let label = this.labels.get(p.userId);
-      if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'sans-serif',fontSize:'9px',color:'#fff9e8',backgroundColor:'#304b3b',padding:{x:3,y:1}}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
+      if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'sans-serif',fontSize:'9px',color:'#ffffff',stroke:'#254033',strokeThickness:2}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
       let labelY=p.y-34;
       while(occupied.some(q=>Math.abs(q.x-p.x)<110 && Math.abs(q.y-labelY)<14)) labelY-=14;
       label.setPosition(p.x,labelY); occupied.push({x:p.x,y:labelY});
@@ -704,8 +712,12 @@ export class GameScene extends Phaser.Scene {
     for (const p of positions) {
       const bubble = this.bubbles.get(p.userId);
       if (bubble) {
-        if (Date.now() >= bubble.expiresAt) { bubble.text.destroy(); this.bubbles.delete(p.userId); }
-        else bubble.text.setPosition(p.x,Math.min(...occupied.filter(q=>Math.abs(q.x-p.x)<110).map(q=>q.y))-16);
+        const now = Date.now();
+        if (now >= bubble.expiresAt) { bubble.text.destroy(); this.bubbles.delete(p.userId); }
+        else {
+          bubble.text.setAlpha(Math.min(1, (now - bubble.startedAt) / 180, (bubble.expiresAt - now) / 300));
+          bubble.text.setPosition(p.x,Math.min(...occupied.filter(q=>Math.abs(q.x-p.x)<110).map(q=>q.y))-16);
+        }
       }
     }
   }
