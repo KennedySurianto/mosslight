@@ -126,6 +126,16 @@ export const SHOP: ShopOffer[] = [
     contents: [{ id: "amber", count: 8 }],
   },
   {
+    id: "casino-wheel",
+    name: "Casino wheel",
+    description: "One placeable wheel · Click to spin 0–36.",
+    price: 5,
+    icon: "wheel",
+    category: "Building",
+    contents: [{ id: "wheel", count: 1 }],
+    badge: "SPIN TO PLAY",
+  },
+  {
     id: "garden-kit",
     name: "Pocket garden",
     description: "10 meadow blocks + 3 cedar seeds.",

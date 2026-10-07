@@ -45,6 +45,41 @@ test.beforeEach(async ({ page }) => {
     () => !!window.__mosslight?.scene.getScene("Game")?.ui,
   );
 });
+test("casino wheel costs five gems, spins on click, and breaks when held", async ({ page }) => {
+  await page.evaluate(() => {
+    const scene = window.__mosslight.scene.getScene("Game");
+    scene.gems = 5;
+    scene.world.clearFoliage(22, 22);
+    scene.world.set(22, 22, 0);
+  });
+  await page.getByRole("button", { name: "Open gem shop" }).click();
+  await page.getByRole("button", { name: "Buy Casino wheel for 5 gems" }).click();
+  await expect.poll(() => page.evaluate(() => window.__mosslight.scene.getScene("Game").gems)).toBe(0);
+  await page.getByRole("button", { name: "Close shop" }).click();
+  await page.evaluate(() => {
+    const scene = window.__mosslight.scene.getScene("Game");
+    scene.inventory.selected = scene.inventory.slots.findIndex(s => s?.id === "wheel");
+  });
+  const point = await screen(page, 22, 22);
+  await page.mouse.click(point.x, point.y, { button: "right" });
+  await expect.poll(() => page.evaluate(() => window.__mosslight.scene.getScene("Game").world.get(22, 22))).toBe(8);
+  await page.waitForTimeout(260);
+  await page.mouse.click(point.x, point.y);
+  await expect.poll(() => page.evaluate(() => (window.__mosslight.scene.getScene("Game") as any).wheelResults.has("22,22"))).toBe(true);
+  const result = await page.evaluate(() => {
+    const label = (window.__mosslight.scene.getScene("Game") as any).wheelResults.get("22,22");
+    return { number: Number(label?.text), color: label?.style.color };
+  });
+  expect(result.number).toBeGreaterThanOrEqual(0);
+  expect(result.number).toBeLessThanOrEqual(36);
+  if (result.number === 0) expect(result.color).toBe("#14854b");
+  else expect(result.color).toMatch(/^#(b43632|171c24)$/);
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.waitForTimeout(1200);
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__mosslight.scene.getScene("Game").world.get(22, 22))).toBe(0);
+});
 test("fresh world, WAD movement, jump, collisions, all seven signs, resize and console", async ({
   page,
 }) => {
@@ -432,7 +467,7 @@ test("gem counter opens a stocked shop, upgrades work and purchases persist", as
 }) => {
   await page.locator("#open-shop").click();
   await expect(page.locator("#shop-overlay")).toBeVisible();
-  await expect(page.locator(".shop-card")).toHaveCount(16);
+  await expect(page.locator(".shop-card")).toHaveCount(17);
   await expect(page.locator('[data-buy="pickaxe"]')).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.locator("#shop-overlay")).toBeHidden();

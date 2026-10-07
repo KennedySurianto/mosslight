@@ -108,7 +108,7 @@ Deno.serve(async (request) => {
     if (type === "action") {
       if (!(await limited(`edit:${userId}`, 90, 60))) return reply({ error: "Slow down a little" }, 429);
       const kind = body.kind;
-      if (kind !== "hit" && kind !== "place") throw new Error("Unknown game action");
+      if (kind !== "hit" && kind !== "place" && kind !== "spin") throw new Error("Unknown game action");
       if (!Number.isInteger(body.selected) || Number(body.selected) < 0 || Number(body.selected) >= 8) throw new Error("Choose a hotbar slot");
       const profile = structuredClone(current.profile.state);
       profile.selected = Number(body.selected);
@@ -121,7 +121,8 @@ Deno.serve(async (request) => {
         seed: current.world.seed, kind, x: Number(body.x), y: Number(body.y), now: Date.now(), canBuild: current.canBuild });
       const next = await commit(userId, current, applied.changed ? applied.world : null,
         applied.changed ? applied.profile : null, applied.session, applied.event ? { ...applied.event, actor: userId } : null);
-      return reply({ data: next, message: applied.message, changed: applied.changed });
+      return reply({ data: next, message: applied.message, changed: applied.changed,
+        spin: applied.event?.kind === "wheel" ? applied.event : null });
     }
     if (type === "purchase") {
       const offerId = typeof body.offerId === "string" ? body.offerId : "";
