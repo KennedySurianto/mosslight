@@ -421,6 +421,27 @@ test("player crosses a one-tile-high tunnel with a one-tile-sized sprite", async
   expect(dimensions.drawWidth).toBeLessThanOrEqual(32);
 });
 
+test("other players block placement and receive their own pickup animation", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => !!window.__mosslight?.scene.getScene("Game")?.ui);
+  const result = await page.evaluate(() => {
+    const scene = window.__mosslight.scene.getScene("Game") as GameScene;
+    const game = scene as any;
+    let sent = false;
+    game.online = { snapshot: { profile: { user_id: "me" } }, action: () => { sent = true; } };
+    scene.setPeers([{ userId: "peer", username: "willow", x: 688, y: 736, facing: 1 }]);
+    game.interact(true, scene.time.now, false, { x: 21, y: 22 });
+    let targetIsPeer = false;
+    const original = scene.drops.visualPickup;
+    scene.drops.visualPickup = (_x, _y, _id, target) => { targetIsPeer = target === game.peers.get("peer"); };
+    scene.applyOnlineWorldEvent({ kind: "tile", actor: "peer", x: 21, y: 23, id: 0, rewards: [{ id: "dirt", count: 1 }] });
+    scene.drops.visualPickup = original;
+    game.online = undefined;
+    return { sent, targetIsPeer };
+  });
+  expect(result).toEqual({ sent: false, targetIsPeer: true });
+});
+
 test("foliage blocks building until punched and clearing survives refresh", async ({
   page,
 }) => {

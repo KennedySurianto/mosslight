@@ -16,6 +16,7 @@ export interface UIActions {
   shopState: () => { gems: number; owned: UpgradeId[] };
   moveInventory?: (from: number, to: number) => void;
   leaveWorld?: () => void;
+  accountAction?: (action: "logout" | "username" | "password") => void;
 }
 export class GameUI {
   private listeners = new AbortController();
@@ -45,7 +46,7 @@ export class GameUI {
   <div class="bottom-hints"><div><kbd>A</kbd><kbd>D</kbd> move <span>·</span> <kbd>W</kbd> jump</div><small>LEFT CLICK <b>break</b><span> / </span>RIGHT CLICK <b>build</b></small></div>
   <div class="world-status"><span id="save-status"><i></i> Saved in this browser</span><small id="coordinates">MEADOW · 19, 23</small></div>
   <section id="inventory" class="inventory"><button id="inventory-handle" class="inventory-handle" aria-label="Drag up to open backpack" aria-expanded="false"><span></span><b>BACKPACK</b><i>⌃</i></button><div class="hotbar-label"><span id="selected-name">Earth</span><small>1–8 TO SELECT</small></div><div id="hotbar" class="slot-grid hotbar"></div><div class="backpack"><div class="backpack-heading"><div><span class="eyebrow">THE THINGS YOU FIND</span><h2>Your backpack</h2></div><span id="capacity"></span></div><div id="pack-grid" class="slot-grid pack-grid"></div><footer>Drag to move · Drop on a matching stack to combine <kbd>E</kbd> to close</footer></div></section>
-  <div id="modal-overlay" class="modal-overlay hidden"><section class="menu" role="dialog" aria-modal="true" aria-labelledby="menu-title"><span class="eyebrow">TAKE A BREATHER</span><h2 id="menu-title">Your little world.</h2><p>Right here when you get back.</p><button id="resume" class="primary">Back to the meadow <span>↗</span></button><button id="home">Return to the white door <span>⌂</span></button><button id="menu-sound">Sound <span>${sound ? "ON" : "OFF"}</span></button><div class="menu-divider"></div><button id="reset" class="danger">Reset world <span>↺</span></button><p class="menu-note">${actions.leaveWorld ? "Your world syncs to your account." : "Your world saves in this browser."}</p><div id="confirm-reset" class="confirm hidden"><h3>Reset your world?</h3><p>All blocks, inventory, gems, and progress will be deleted.</p><button id="cancel-reset">Keep my world</button><button id="do-reset" class="danger">Yes, reset everything</button></div></section></div>`;
+  <div id="modal-overlay" class="modal-overlay hidden"><section class="menu" role="dialog" aria-modal="true" aria-labelledby="menu-title"><span class="eyebrow">TAKE A BREATHER</span><h2 id="menu-title">Your little world.</h2><p>Right here when you get back.</p><button id="resume" class="primary">Back to the meadow <span>↗</span></button><button id="home">Return to the white door <span>⌂</span></button><button id="menu-sound">Sound <span>${sound ? "ON" : "OFF"}</span></button>${actions.accountAction ? '<div class="menu-divider"></div><button id="change-username">Change username <span>✎</span></button><button id="change-password">Change password <span>✎</span></button><button id="menu-logout" class="danger">Log out <span>↪</span></button>' : ''}<div class="menu-divider"></div><button id="reset" class="danger">Reset world <span>↺</span></button><p class="menu-note">${actions.leaveWorld ? "Your world syncs to your account." : "Your world saves in this browser."}</p><div id="confirm-reset" class="confirm hidden"><h3>Reset your world?</h3><p>All blocks, inventory, gems, and progress will be deleted.</p><button id="cancel-reset">Keep my world</button><button id="do-reset" class="danger">Yes, reset everything</button></div></section></div>`;
     this.shopPanel = new ShopPanel(this.root, actions.buy, (open) => {
       this.paused = open;
       actions.pause(open);
@@ -87,6 +88,12 @@ export class GameUI {
       this.shopPanel.toggle(true);
     });
     on("resume", () => this.togglePause(false));
+    if (actions.accountAction) {
+      const account = actions.accountAction;
+      on("change-username", () => { this.togglePause(false); account("username"); });
+      on("change-password", () => { this.togglePause(false); account("password"); });
+      on("menu-logout", () => { this.togglePause(false); account("logout"); });
+    }
     on("home", () => {
       actions.home();
       this.togglePause(false);

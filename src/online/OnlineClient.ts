@@ -37,12 +37,16 @@ export class OnlineClient {
     });
   }
   async currentUser() {
-    const { data } = await this.client.auth.getUser();
+    const { data: sessionData, error: sessionError } = await this.client.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!sessionData.session) return null;
+    const { data, error } = await this.client.auth.getUser();
+    if (error) throw error;
     return data.user;
   }
   async signOut() {
     await this.leave();
-    await this.client.auth.signOut();
+    await this.client.auth.signOut({ scope: "local" });
   }
   private async invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
     const { data: sessionData } = await this.client.auth.getSession();
@@ -55,8 +59,30 @@ export class OnlineClient {
       body: JSON.stringify(body),
     });
     const result = await response.json().catch(() => ({ error: "Server did not respond" }));
-    if (!response.ok) throw new Error(result.error || "Request failed");
+    if (!response.ok) {
+      if (result.code === "DATABASE_FULL" ||
+          ((response.status === 401 || response.status >= 500) && (await this.status().catch(() => null))?.databaseFull))
+        window.dispatchEvent(new Event("mosslight:database-full"));
+      throw new Error(result.error || "Request failed");
+    }
     return result as T;
+  }
+  async status() {
+    const response = await fetch(`${url}/functions/v1/mosslight-auth`, {
+      method: "POST", headers: { "Content-Type": "application/json", apikey: key! },
+      body: '{"action":"status"}', signal: AbortSignal.timeout(8000),
+    });
+    const result = await response.json();
+    if (!response.ok || typeof result.databaseFull !== "boolean") throw new Error(result.error || "Online status unavailable");
+    return result as { databaseFull: boolean };
+  }
+  async changeUsername(username: string) {
+    const result = await this.invoke<{ username: string }>("mosslight-auth", { action: "username", username });
+    if (this.snapshot) this.snapshot.profile.username = result.username;
+    return result.username;
+  }
+  async changePassword(oldPassword: string, newPassword: string, confirmPassword: string) {
+    await this.invoke("mosslight-auth", { action: "password", oldPassword, newPassword, confirmPassword });
   }
   async auth(action: "login" | "register", username: string, password: string, confirmPassword?: string, captcha?: string) {
     const result = await this.invoke<{ session: { access_token: string; refresh_token: string } }>("mosslight-auth", { action, username, password, confirmPassword, captcha });
@@ -90,6 +116,10 @@ export class OnlineClient {
         this.onPresence(this.peers);
       }
       if (payload?.kind === 'rename' && this.snapshot?.world.id === worldId) this.snapshot.world.name = String(payload.name);
+      if (payload?.kind === 'identity' && typeof payload.userId === 'string' && typeof payload.username === 'string') {
+        const peer = this.peers.find(p => p.userId === payload.userId);
+        if (peer) peer.username = payload.username;
+      }
       if (payload && typeof payload === "object") this.onWorldEvent(payload as Record<string, unknown>);
     });
     channel.on("broadcast", { event: "move" }, ({ payload }) => {

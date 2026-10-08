@@ -651,6 +651,8 @@ button:active {
 }
 .menu {
   width: 355px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
   padding: 32px;
   background: #f5f0d9;
   border: 1px solid #fffae7;

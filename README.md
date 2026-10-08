@@ -8,7 +8,7 @@ Mosslight is a Growtopia-inspired 2D sandbox game where players explore, build, 
 - Dig, collect, craft your loadout, and place blocks, seeds, and decorations.
 - Grow and harvest plants, earn gems, and unlock tools and movement upgrades in the shop.
 - Learn the game through a guided tutorial, responsive sign prompts, and sound feedback.
-- Play solo with local saves, or register to visit friends and build together online.
+- Register to visit friends and build together online; browser-only solo play is available for local development and a full-database fallback.
 
 ## Tech
 

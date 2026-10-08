@@ -8,6 +8,7 @@ const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 const headers = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers });
+const readOnlyError = (error: unknown) => /read.only transaction|SQLSTATE.?25006/i.test(String((error as { message?: string })?.message ?? error));
 function required<T>(result: { data: T; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
   return result.data;
@@ -102,7 +103,8 @@ Deno.serve(async (request) => {
     if (type === "position") {
       const x = Number(body.x), y = Number(body.y), facing = Number(body.facing);
       const next = moveSession(session, current.world.state, current.world.seed, x, y, facing, Date.now());
-      if (!required(await admin.rpc("mosslight_position", { p_user: userId, p_world: current.world.id, p_state: next }))) throw new Error("World session expired");
+      if (!required(await admin.rpc("mosslight_position", { p_user: userId, p_world: current.world.id,
+        p_state: { ...next, worldRevision: current.world.revision } }))) throw new Error("World changed; try again");
       return reply({ ok: true });
     }
     if (type === "action") {
@@ -150,6 +152,10 @@ Deno.serve(async (request) => {
     throw new Error("Unknown request");
   } catch (error) {
     console.error("Mosslight game error", error);
+    if (readOnlyError(error)) {
+      const { data: full } = await admin.rpc("mosslight_capacity_full").catch(() => ({ data: false }));
+      if (full === true) return reply({ error: "Database storage limit reached", code: "DATABASE_FULL" }, 507);
+    }
     const message = error instanceof Error ? error.message : "Something went wrong";
     return reply({ error: message.length < 160 ? message : "Something went wrong" }, /expired|sign in/i.test(message) ? 401 : /retry|State changed/i.test(message) ? 409 : 400);
   }

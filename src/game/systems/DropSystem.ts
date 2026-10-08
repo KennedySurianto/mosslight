@@ -48,12 +48,12 @@ export class DropSystem {
       sprite: this.scene.add.image(x, y, key).setScale(scale).setDepth(12),
     });
   }
-  visualPickup(x: number, y: number, id: ItemId | "gem", player: Player) {
+  visualPickup(x: number, y: number, id: ItemId | "gem", player: Pick<Player, "x" | "y"> & { pickupRange?: number }) {
     const key = id === "gem" || ITEMS[id].growth ? id : `tile-${ITEMS[id].tile}`;
     const sprite = this.scene.add.image(x, y, key).setScale(id === "gem" ? .65 : .45).setDepth(13);
     const flight = { progress: 0 };
     this.scene.tweens.add({
-      targets: flight, progress: 1, duration: player.pickupRange > 70 ? 260 : 420, ease: "Cubic.easeIn",
+      targets: flight, progress: 1, duration: (player.pickupRange ?? 70) > 70 ? 260 : 420, ease: "Cubic.easeIn",
       onUpdate: () => {
         const t = flight.progress;
         sprite.setPosition(x + (player.x - x) * t, y + (player.y - 18 - y) * t - Math.sin(Math.PI * t) * 16);
