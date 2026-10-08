@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chatText, chatDuration, worldName } from '../supabase/functions/_shared/social';
-import { applyAction, initialProfile, initialSession, initialWorld, moveSession, tileAt } from "../supabase/functions/_shared/mosslight";
+import { applyAction, awardedItems, initialProfile, initialSession, initialWorld, moveSession, tileAt } from "../supabase/functions/_shared/mosslight";
 
 describe("server-authoritative multiplayer rules", () => {
   const seed = 1234;
@@ -19,6 +19,14 @@ describe("server-authoritative multiplayer rules", () => {
     expect(second.changed).toBe(true);
     expect(tileAt(second.world, 21, 23, seed)).toBe(0);
     expect(second.profile.stats.broken).toBe(1);
+    expect(second.event).toMatchObject({ kind: "tile", id: 0, rewards: [{ id: "grass", count: 1 }] });
+  });
+  it("broadcasts only rewards actually added to the breaker inventory", () => {
+    const before = initialProfile(), after = structuredClone(before);
+    after.inventory[3] = { id: "stone", count: 2 };
+    after.gems += 3;
+    expect(awardedItems(before, after)).toEqual([{ id: "stone", count: 2 }, { id: "gem", count: 3 }]);
+    expect(awardedItems(after, before)).toEqual([]);
   });
   it("spins a placed wheel without storing a result or awarding gems", () => {
     const world = initialWorld(seed), profile = initialProfile(), session = initialSession();

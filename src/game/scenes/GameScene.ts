@@ -24,7 +24,9 @@ import { WorldHud } from '../../online/WorldHud';
 import { spinWheel, type ProfileState, type WheelResult } from '../../../supabase/functions/_shared/mosslight';
 export class GameScene extends Phaser.Scene {
   online?: OnlineClient;
+  soloCapacity = false;
   onLeaveOnline?: () => void;
+  onAccountAction?: (action: "logout" | "username" | "password") => void;
   private onlineWorldRevision = -1;
   private onlinePositionAt = 0;
   private onlinePositionPending = false;
@@ -162,6 +164,7 @@ export class GameScene extends Phaser.Scene {
         backpackOpened: () => this.markGuide("backpack"),
         buy: (id) => this.purchase(id),
         leaveWorld: this.online ? () => this.onLeaveOnline?.() : undefined,
+        accountAction: this.online ? (action) => this.onAccountAction?.(action) : undefined,
         shopState: () => ({ gems: this.gems, owned: this.shop.owned }),
         feedback: () => this.audio.play("ui"),
         reset: () => this.online ? this.ui.toast("Online worlds cannot be reset here.") : this.resetWorld(),
@@ -189,6 +192,11 @@ export class GameScene extends Phaser.Scene {
       },
       this.audio.enabled,
     );
+    if (this.soloCapacity) {
+      this.ui.root.querySelector(".world-label")!.innerHTML = "<i></i> SOLO WORLD · ONLINE STORAGE FULL";
+      this.ui.root.querySelector(".menu-note")!.textContent = "Online storage is full. This solo world saves only in this browser.";
+      this.ui.toast("Online storage is full. Playing in your browser-only world.");
+    }
     this.inventory.onChange = () => {
       this.ui.render();
       this.changed();
@@ -270,7 +278,7 @@ export class GameScene extends Phaser.Scene {
     this.keys?.D.reset();
     this.keys?.W.reset();
     this.keys?.SPACE.reset();
-    const keyboard = this.input.keyboard;
+    const keyboard = this.input?.keyboard;
     if (!keyboard) return;
     keyboard.enabled = !open;
     if (open) keyboard.disableGlobalCapture();
@@ -289,6 +297,12 @@ export class GameScene extends Phaser.Scene {
     const { x, y } = target ?? this.cursor();
     if (!this.blocks.reachable(x, y)) {
       this.hint("A little closer — reach is about 4 tiles.");
+      return;
+    }
+    if (place && this.online && Array.from(this.peers.values()).some(peer =>
+      peer.x + 10 > x * 32 && peer.x - 10 < (x + 1) * 32 &&
+      peer.y > y * 32 && peer.y - 30 < (y + 1) * 32)) {
+      this.hint("A player is standing there");
       return;
     }
     if (this.online && this.onlineActionPending) {
@@ -682,6 +696,10 @@ export class GameScene extends Phaser.Scene {
   }
   applyOnlineWorldEvent(event: Record<string, unknown>) {
     if (event.kind === 'rename' && typeof event.name === 'string') { this.socialHud?.updateName(event.name); return; }
+    if (event.kind === 'identity' && typeof event.userId === 'string' && typeof event.username === 'string') {
+      if (this.peerNames.has(event.userId)) this.peerNames.set(event.userId, event.username);
+      return;
+    }
     if (!this.world || event.actor === this.online?.snapshot?.profile.user_id) return;
     const x = Number(event.x), y = Number(event.y);
     if (event.kind === 'wheel' && Number.isInteger(x) && Number.isInteger(y)) {
@@ -703,6 +721,18 @@ export class GameScene extends Phaser.Scene {
     } else if (event.kind === "harvest" && Number.isInteger(x) && Number.isInteger(y)) {
       this.seeds.trees = this.seeds.trees.filter((t) => t.x !== x || t.y !== y);
       this.world.revision++;
+    }
+    if ((event.kind === "harvest" || (event.kind === "tile" && event.id === 0)) &&
+        Number.isInteger(x) && Number.isInteger(y) && Array.isArray(event.rewards)) {
+      const peer = this.peers.get(String(event.actor));
+      if (peer) for (const reward of event.rewards.slice(0, 4)) {
+        if (!reward || typeof reward !== "object") continue;
+        const id = (reward as { id?: unknown }).id;
+        const count = (reward as { count?: unknown }).count;
+        if ((id === "gem" || (typeof id === "string" && Object.hasOwn(ITEMS, id))) &&
+            Number.isInteger(count) && Number(count) > 0 && Number(count) <= 999)
+          this.drops.visualPickup(x * 32 + 16, y * 32 + (id === "gem" ? 8 : 12), id as keyof typeof ITEMS | "gem", peer);
+      }
     }
   }
   updatePeer(userId: string, x: number, y: number, facing: number) {
@@ -804,6 +834,7 @@ export class GameScene extends Phaser.Scene {
     for (const p of positions.sort((a,b)=>a.userId.localeCompare(b.userId))) {
       let label = this.labels.get(p.userId);
       if (!label) { label = this.add.text(0,0,p.username,{fontFamily:'monospace',fontSize:'11px',fontStyle:'bold',color:'#ffffff',stroke:'#1a3326',strokeThickness:3}).setOrigin(.5,1).setDepth(45); this.labels.set(p.userId,label); }
+      if (label.text !== p.username) label.setText(p.username);
       let labelY=p.y-34;
       while(occupied.some(q=>Math.abs(q.x-p.x)<110 && Math.abs(q.y-labelY)<14)) labelY-=14;
       label.setPosition(p.x,labelY); occupied.push({x:p.x,y:labelY});

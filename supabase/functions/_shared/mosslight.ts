@@ -8,6 +8,7 @@ export const REACH = 4.6 * TILE;
 export const ITEM_IDS = ["dirt", "grass", "wood", "stone", "slate", "amber", "wheel", "seed", "stoneSeed"] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 export type Stack = { id: ItemId; count: number };
+export type Reward = { id: ItemId | "gem"; count: number };
 export type Tree = { x: number; y: number; type: "seed" | "stoneSeed"; plantedAt: number; growthDuration: number };
 export type WorldState = { modifications: Record<string, number>; clearedFoliage: string[]; trees: Tree[] };
 export type ProfileState = {
@@ -219,5 +220,18 @@ export function applyAction(input: { world: WorldState; profile: ProfileState; s
   if (Object.keys(world.modifications).length > 3500 || world.clearedFoliage.length > 128 || JSON.stringify(world).length > 131072)
     throw new Error("World edit limit reached");
   if (profile.gems > 1000000 || JSON.stringify(profile).length > 8192) throw new Error("Player limit reached");
+  if (event && (event.kind === "harvest" || (event.kind === "tile" && event.id === 0)))
+    event.rewards = awardedItems(input.profile, profile);
   return { world, profile, session, changed, event, message };
+}
+
+export function awardedItems(before: ProfileState, after: ProfileState): Reward[] {
+  const total = (profile: ProfileState, id: ItemId) =>
+    profile.inventory.reduce((count, slot) => count + (slot?.id === id ? slot.count : 0), 0);
+  const rewards: Reward[] = ITEM_IDS.flatMap(id => {
+    const count = total(after, id) - total(before, id);
+    return count > 0 ? [{ id, count }] : [];
+  });
+  if (after.gems > before.gems) rewards.push({ id: "gem", count: after.gems - before.gems });
+  return rewards;
 }

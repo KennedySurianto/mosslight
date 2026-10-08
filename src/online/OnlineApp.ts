@@ -13,9 +13,11 @@ export class OnlineApp {
   private mode: "login" | "register" = "login";
   private activeWorldId?: string;
   private overlayHeartbeat?: number;
+  private fallingBack = false;
   constructor(private game: Phaser.Game) {
     this.root.id = "online-app";
     document.body.append(this.root);
+    window.addEventListener("mosslight:database-full", () => void this.enterSolo());
     this.client.onWorldEvent = (event) => this.scene().applyOnlineWorldEvent(event);
     this.client.onPeerMove = (userId, payload) => this.scene().updatePeer(userId, Number(payload.x), Number(payload.y), Number(payload.facing));
     this.client.onPresence = (players) => this.scene()?.setPeers(players);
@@ -24,10 +26,35 @@ export class OnlineApp {
   }
   private scene() { return this.game.scene.getScene("Game") as GameScene; }
   private async start() {
+    this.set('<span class="eyebrow">Mosslight · Online</span><h1>Opening the meadow…</h1><p>Checking your world.</p>');
     try {
+      if ((await this.client.status()).databaseFull) { await this.enterSolo(); return; }
       if (await this.client.currentUser()) { await this.client.refresh(); this.lobby(); }
       else this.auth();
-    } catch { this.auth(); }
+    } catch (error) {
+      if (!this.fallingBack) this.unavailable(error instanceof Error ? error.message : "Online service unavailable");
+    }
+  }
+  private unavailable(message: string) {
+    this.set(`<span class="eyebrow">Mosslight · Online</span><h1>Could not reach your world.</h1><p>Your online progress is safe. Please try again.</p><p class="online-error" role="alert">${escape(message)}</p><button id="retry-online" class="primary">Try again ↗</button>`);
+    this.root.querySelector("#retry-online")!.addEventListener("click", () => void this.start());
+  }
+  private async enterSolo() {
+    if (this.fallingBack) return;
+    this.fallingBack = true;
+    this.directory?.destroy();
+    window.clearInterval(this.overlayHeartbeat);
+    this.overlayHeartbeat = undefined;
+    await this.client.leave().catch(() => {});
+    this.game.scene.stop("Game");
+    const scene = this.scene();
+    scene.online = undefined;
+    scene.onLeaveOnline = undefined;
+    scene.onAccountAction = undefined;
+    scene.soloCapacity = true;
+    this.activeWorldId = undefined;
+    this.root.hidden = true;
+    this.game.scene.start("Game");
   }
   private set(html: string) {
     this.root.innerHTML = `<div class="online-shade"><section class="online-card" role="dialog" aria-modal="true">${html}</section></div>`;
@@ -71,19 +98,51 @@ export class OnlineApp {
     };
     this.root.querySelector('#visit-own')?.addEventListener('click', () => own && visit(own.id));
     this.root.querySelector('#close-worlds')?.addEventListener('click', () => this.closeWorlds());
-    this.root.querySelector('#logout')!.addEventListener('click', () => void this.run(async () => {
-      await this.client.signOut(); this.directory?.destroy();
-      window.clearInterval(this.overlayHeartbeat); this.overlayHeartbeat = undefined;
-      this.activeWorldId = undefined; this.game.scene.stop('Game'); this.mode='login'; this.auth();
-    }));
+    this.root.querySelector('#logout')!.addEventListener('click', () => void this.run(() => this.logout()));
     this.directory = new PlayerDirectory(this.root.querySelector('#player-directory')!,this.client,visit);
+  }
+  private async logout() {
+    await this.client.signOut();
+    this.directory?.destroy();
+    window.clearInterval(this.overlayHeartbeat);
+    this.overlayHeartbeat = undefined;
+    this.activeWorldId = undefined;
+    this.game.scene.stop("Game");
+    this.mode = "login";
+    this.auth();
+  }
+  private accountAction(action: "logout" | "username" | "password") {
+    if (action === "logout") {
+      this.set('<span class="eyebrow">Mosslight · Account</span><h1>Signing out…</h1><p class="online-error" role="alert"></p>');
+      void this.run(() => this.logout());
+      return;
+    }
+    const username = action === "username";
+    this.set(`<span class="eyebrow">Mosslight · Account</span><h1>${username ? "Change username" : "Change password"}</h1><p>${username ? "Your world and friends will stay with this account." : "Enter your current password to choose a new one."}</p><form id="account-form">${username ? `<label>New username<input name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" value="${escape(this.client.snapshot!.profile.username)}" required></label>` : '<label>Old password<input name="oldPassword" type="password" autocomplete="current-password" required></label><label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="10" maxlength="72" required></label><label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="10" maxlength="72" required></label>'}<button class="primary" type="submit">Save change ↗</button></form><button id="cancel-account" class="online-text" type="button">Cancel</button><p class="online-error" role="alert"></p>`);
+    this.root.querySelector("#cancel-account")!.addEventListener("click", () => this.activeWorldId ? this.closeWorlds() : this.lobby());
+    this.root.querySelector("#account-form")!.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = new FormData(event.target as HTMLFormElement);
+      void this.run(async () => {
+        if (username) {
+          const name = await this.client.changeUsername(String(form.get("username")));
+          if (this.activeWorldId) this.scene().ui.toast(`Username changed to ${name}`);
+        } else {
+          await this.client.changePassword(String(form.get("oldPassword")), String(form.get("newPassword")), String(form.get("confirmPassword")));
+          if (this.activeWorldId) this.scene().ui.toast("Password updated");
+        }
+        if (this.activeWorldId) this.closeWorlds(); else this.lobby();
+      });
+    });
   }
   private async enter(worldId: string) {
     const snapshot: OnlineSnapshot = await this.client.join(worldId);
     this.activeWorldId = worldId;
     const scene = this.scene();
     scene.online = this.client;
+    scene.soloCapacity = false;
     scene.onLeaveOnline = () => this.openWorlds();
+    scene.onAccountAction = (action) => this.accountAction(action);
     this.game.scene.stop("Game");
     this.game.scene.start("Game");
     this.client.snapshot = snapshot;
