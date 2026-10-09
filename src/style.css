@@ -1359,8 +1359,10 @@ button:active {
 .hud-social-copy b { font-size: 10px; letter-spacing: .09em; }
 .hud-social-copy small { font-size: 7px; letter-spacing: .06em; opacity: .7; }
 #online-app[hidden] { display: none; }
-#online-app { position: fixed; inset: 0; z-index: 100; }
-.online-shade { min-height: 100%; padding: 32px 16px; overflow: auto; display: grid; place-items: center; background: #1833289c; backdrop-filter: blur(9px); }
+#online-app { position: fixed; inset: 0; z-index: 100; overflow: hidden; background: #92c2b7; }
+.welcome-landscape { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+#online-app > div { position: relative; height: 100%; }
+.online-shade { height: 100%; padding: 32px 16px; overflow: auto; display: grid; place-items: center; background: linear-gradient(90deg,#173d3438,#173d340d 48%,#173d3438); }
 .online-card { width: min(660px, 100%); max-height: calc(100vh - 64px); overflow: auto; padding: 32px; color: #2d493b; background: linear-gradient(145deg,#faf6e6f7,#e7eedaf2); border: 1px solid #fffae7; border-radius: 18px; box-shadow: 0 22px 85px #10291d7a, inset 0 1px #fff; }
 .online-card h1 { font: normal 32px Georgia,serif; margin: 10px 0; }
 .online-card h2 { font: normal 22px Georgia,serif; margin: 25px 0 10px; }

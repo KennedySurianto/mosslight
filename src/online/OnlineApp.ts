@@ -2,12 +2,14 @@ import type * as Phaser from "phaser";
 import { PlayerDirectory } from "./PlayerDirectory";
 import type { GameScene } from "../game/scenes/GameScene";
 import { OnlineClient, type OnlineSnapshot } from "./OnlineClient";
+import { WelcomeLandscape } from "./WelcomeLandscape";
 
 const escape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export class OnlineApp {
   private client = new OnlineClient();
   private root = document.createElement("div");
+  private panel = document.createElement("div");
   private directory?: PlayerDirectory;
   private busy = false;
   private mode: "login" | "register" = "login";
@@ -16,6 +18,8 @@ export class OnlineApp {
   private fallingBack = false;
   constructor(private game: Phaser.Game) {
     this.root.id = "online-app";
+    new WelcomeLandscape(this.root);
+    this.root.append(this.panel);
     document.body.append(this.root);
     window.addEventListener("mosslight:database-full", () => void this.enterSolo());
     this.client.onWorldEvent = (event) => this.scene().applyOnlineWorldEvent(event);
@@ -57,7 +61,7 @@ export class OnlineApp {
     this.game.scene.start("Game");
   }
   private set(html: string) {
-    this.root.innerHTML = `<div class="online-shade"><section class="online-card" role="dialog" aria-modal="true">${html}</section></div>`;
+    this.panel.innerHTML = `<div class="online-shade"><section class="online-card" role="dialog" aria-modal="true">${html}</section></div>`;
     this.root.hidden = false;
     // Auth can appear before Phaser has booted the Game scene.
     (this.game.scene.getScene("Game") as GameScene | null)?.setOnlineOverlay(true);

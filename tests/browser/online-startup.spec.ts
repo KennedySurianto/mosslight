@@ -33,6 +33,10 @@ test("healthy online startup waits for login without creating a solo world", asy
   await page.goto(base);
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await expect(page.locator(".world-label")).toHaveCount(0);
+  const landscape = page.locator(".welcome-landscape");
+  await expect(landscape).toBeVisible();
+  await expect(landscape).toHaveCSS("image-rendering", "pixelated");
+  expect(await landscape.evaluate((canvas: HTMLCanvasElement) => canvas.width > 0 && canvas.height > 0 && !!canvas.getContext("2d")?.getImageData(0, 0, 1, 1).data[3])).toBe(true);
   await page.getByRole("button", { name: "New here? Register" }).click();
   await expect(page.getByRole("heading", { name: "Plant a new beginning" })).toBeVisible();
 });
