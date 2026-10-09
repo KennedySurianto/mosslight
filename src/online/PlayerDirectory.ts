@@ -1,5 +1,6 @@
 import type { OnlineClient, PlayerResult, PlayerLocation } from './OnlineClient';
 const escape = (text: string) => text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+const skeleton = (count: number) => Array.from({ length: count }, () => `<div class="player-card player-card-skeleton" aria-hidden="true"><div class="player-card-head"><span><i class="skeleton-line skeleton-name"></i><i class="skeleton-line skeleton-status"></i></span><i class="skeleton-line skeleton-location"></i></div><div class="player-world"><div class="online-row"><i class="skeleton-line skeleton-world"></i><i class="skeleton-line skeleton-button"></i></div></div></div>`).join('');
 export class PlayerDirectory {
   private version = 0;
   private next: string | null = null;
@@ -20,6 +21,7 @@ export class PlayerDirectory {
     this.more = root.querySelector('.directory-more')!; this.error = root.querySelector('.directory-error')!;
     this.input.addEventListener('input', () => {
       clearTimeout(this.debounce); this.version++; this.loading = false; this.next = null; this.more.hidden = true;
+      this.list.setAttribute('aria-busy', 'true'); this.list.innerHTML = skeleton(3); this.error.textContent = '';
       this.debounce = setTimeout(() => void this.load(true),300);
     });
     this.more.addEventListener('click', () => void this.load(false));
@@ -41,11 +43,14 @@ export class PlayerDirectory {
   private async load(reset: boolean) {
     if (this.destroyed || this.loading || (!reset && !this.next)) return;
     const version = reset ? ++this.version : this.version;
-    if (reset) { this.results.clear(); this.list.replaceChildren(); this.next = null; }
+    if (reset) { this.results.clear(); this.list.innerHTML = skeleton(3); this.next = null; }
+    else this.list.insertAdjacentHTML('beforeend', skeleton(1));
+    this.list.setAttribute('aria-busy', 'true');
     this.loading = true; this.more.hidden = false; this.more.disabled = true; this.more.textContent = 'Loading…'; this.error.textContent = '';
     try {
       const page = await this.client.players(this.input.value.trim().toLowerCase(), reset ? '' : this.next!);
       if (this.destroyed || version !== this.version) return;
+      this.list.querySelectorAll('.player-card-skeleton').forEach(card => card.remove());
       for (const player of page.players) { this.results.set(player.userId,player); this.append(player); }
       this.next = page.next;
       if (!this.results.size) this.list.innerHTML = '<p class="online-muted">No players found. Try the beginning of a username.</p>';
@@ -54,6 +59,8 @@ export class PlayerDirectory {
       if (version === this.version) { this.error.textContent = error instanceof Error ? error.message : 'Search failed'; this.more.textContent='Retry'; }
     } finally {
       if (version === this.version && !this.destroyed) {
+        this.list.querySelectorAll('.player-card-skeleton').forEach(card => card.remove());
+        this.list.removeAttribute('aria-busy');
         this.loading=false; this.more.disabled=false; this.more.hidden=!this.next;
         this.more.textContent='Load more';
       }
