@@ -1413,6 +1413,17 @@ button#world-name:hover { text-decoration: underline dotted; text-underline-offs
 .player-card-head > span:first-child { flex: 1; }
 .player-card-head b { display: block; font-size: 14px; }
 .player-card-head small { display: block; margin-top: 2px; font-size: 10px; opacity: .8; }
+.player-card-skeleton { pointer-events: none; }
+.player-card-skeleton .player-card-head { min-height: 51px; }
+.player-card-skeleton .player-world .online-row { min-height: 43px; }
+.skeleton-line { display: block; height: 11px; border-radius: 4px; background: linear-gradient(90deg,#dbe6cf 20%,#f5f6e7 50%,#dbe6cf 80%); background-size: 220% 100%; animation: player-skeleton-shimmer 1.5s linear infinite; }
+.skeleton-name { width: 100px; margin-bottom: 6px; }
+.skeleton-status { width: 58px; height: 8px; }
+.skeleton-location { width: 80px; height: 8px; }
+.skeleton-world { width: 140px; }
+.skeleton-button { width: 53px; height: 25px; border-radius: 7px; }
+@keyframes player-skeleton-shimmer { to { background-position-x: -220%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-line { animation: none; } }
 .world-card-mark { color: #5b7d5b; font: 25px Georgia,serif; }
 .player-world { padding: 0 12px 9px; }
 .player-world .online-row { padding: 7px 0; }
